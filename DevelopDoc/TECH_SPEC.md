@@ -1,0 +1,376 @@
+# TECH_SPEC — Seller Insight AI
+
+| 항목 | 내용 |
+|---|---|
+| 문서 | 기술 명세 |
+| 주 담당 | B (Backend / 통합) |
+| 관련 문서 | [PRD.md](PRD.md), [WORK_UNITS.md](WORK_UNITS.md) |
+
+---
+
+## 1. 시스템 아키텍처
+
+```text
+┌──────────────────────────┐
+│ Frontend (Vercel)        │  Next.js · React · TypeScript · Recharts
+│  upload / dashboard /    │
+│  insight                 │
+└────────────┬─────────────┘
+             │ HTTPS (multipart/form-data, JSON)
+             ▼
+┌──────────────────────────┐
+│ Backend (Render)         │  FastAPI · Pydantic
+│  routers/ → 요청 검증    │
+│      │                   │
+│      ├─ analysis/ (C)    │  pandas · openpyxl
+│      │   normalize → kpi → compare → signals
+│      │                   │
+│      └─ ai/ (D)          │  LLM API
+│          planner → (analysis 실행) → insight
+└────────────┬─────────────┘
+             │ JSON { kpis, comparison, rows, signals, insight }
+             ▼
+        Frontend 렌더링
+```
+
+### 처리 흐름 (`/api/analyze`)
+
+```text
+1. 파일 수신 및 개수·크기·확장자 검증        (B)
+2. 파일 파싱 → DataFrame                     (C: normalize)
+3. 플랫폼 판별 + 공통 스키마로 정규화        (C: normalize)
+4. KPI 계산                                   (C: kpi)
+5. 전월·플랫폼 비교                           (C: compare)
+6. 이상 신호 계산                             (C: signals)
+7. 질문이 있으면 → 분석 계획 JSON 생성        (D: planner)
+   → 계획에 따라 pandas 계산 실행            (C: compare.run_plan)
+8. KPI/비교/신호/질문 결과 → 인사이트 생성    (D: insight)
+9. 응답 JSON 조립 및 반환                     (B)
+```
+
+LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반환한다.
+
+## 2. 기술 스택
+
+| 영역 | 기술 | 비고 |
+|---|---|---|
+| Frontend | Next.js (App Router), React, TypeScript | |
+| Chart | Recharts | |
+| Backend | Python 3.11+, FastAPI, Uvicorn | |
+| Validation | Pydantic v2 | 요청·응답·AI JSON 검증 |
+| Data | pandas, openpyxl | XLSX 읽기 |
+| AI | LLM API (JSON 출력 모드 사용) | |
+| Test | pytest (backend) | |
+| Deploy | Vercel (FE), Render (BE) | |
+
+## 3. 디렉터리 구조 및 소유권
+
+```text
+.
+├─ frontend/                      ← A
+│  ├─ app/
+│  ├─ components/
+│  ├─ features/
+│  │  ├─ upload/
+│  │  ├─ dashboard/
+│  │  └─ insight/
+│  ├─ lib/api/                    # API 클라이언트
+│  └─ types/                      # shared/contracts 와 동기화된 TS 타입
+├─ backend/
+│  ├─ app/
+│  │  ├─ main.py                  ← B
+│  │  ├─ schemas.py               ← B
+│  │  ├─ routers/                 ← B  (health.py, preview.py, analyze.py)
+│  │  ├─ core/                    ← B  (config.py, errors.py)
+│  │  ├─ analysis/                ← C
+│  │  │  ├─ normalize.py
+│  │  │  ├─ kpi.py
+│  │  │  ├─ compare.py
+│  │  │  └─ signals.py
+│  │  └─ ai/                      ← D
+│  │     ├─ planner.py
+│  │     ├─ insight.py
+│  │     └─ prompts/
+│  ├─ tests/
+│  │  ├─ test_api.py              ← B
+│  │  ├─ test_analysis.py         ← C
+│  │  └─ test_ai.py               ← D
+│  └─ requirements.txt
+├─ shared/
+│  ├─ contracts/                  ← 전원 합의 / B 관리
+│  └─ fixtures/                   ← C
+└─ DevelopDoc/
+```
+
+## 4. 공통 데이터 스키마 (정규화 결과)
+
+> 변경 시 전원 합의 필수. 원본 정의는 `shared/contracts/` 에 둔다.
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `period` | string (`YYYY-MM`) | 기간 |
+| `platform` | string (`coupang` \| `naver`) | 플랫폼 |
+| `product_id` | string | 상품 ID |
+| `product_name` | string | 상품명 |
+| `revenue` | number (원) | 매출 |
+| `orders` | integer | 주문 수 |
+| `units` | integer | 판매 수량 |
+| `ad_spend` | number (원) | 광고비 |
+| `ad_revenue` | number (원) | 광고 전환매출 |
+
+### 4-1. 플랫폼 컬럼 매핑
+
+| 공통 필드 | 쿠팡 | 네이버 |
+|---|---|---|
+| `revenue` | 총매출 | 판매금액(순) |
+| `orders` | 주문 | 상품결제건수 |
+| `units` | 판매량 | 결제상품수량 |
+| `ad_spend` | 광고비 | 광고비용 |
+| `ad_revenue` | 광고매출 | 전환매출 |
+
+매핑 테이블은 `analysis/normalize.py` 의 `PLATFORM_COLUMN_MAP` 상수로 관리하며, 새 플랫폼은 이 매핑 추가만으로 지원할 수 있도록 한다.
+
+### 4-2. 정규화 규칙
+
+- 숫자 컬럼의 `,`, `원`, 공백 제거 후 숫자 변환
+- 변환 불가 값 → `INVALID_NUMBER` 오류 (행 번호·컬럼명 포함)
+- 필수 컬럼 누락 → `MISSING_COLUMNS` 오류 (누락 컬럼 목록 포함)
+- 데이터 행 0개 → `EMPTY_FILE` 오류
+- 빈 숫자 셀 → 0 으로 처리
+
+## 5. KPI 계산 명세
+
+| KPI | 계산식 | 단위 |
+|---|---|---|
+| `revenue` | Σ revenue | 원 |
+| `orders` | Σ orders | 건 |
+| `units` | Σ units | 개 |
+| `ad_spend` | Σ ad_spend | 원 |
+| `ad_revenue` | Σ ad_revenue | 원 |
+| `roas` | ad_revenue ÷ ad_spend × 100 | % |
+| 증감률 (`*_change`) | (당월 − 전월) ÷ 전월 × 100 | % |
+| ROAS 증감 (`roas_change_pp`) | 당월 ROAS − 전월 ROAS | %p |
+
+- 반올림: 표시용 값은 소수 첫째 자리 (`round(x, 1)`), 내부 계산은 원값 유지
+- 분모가 0인 경우 `null` 반환 (0 이나 무한대로 표시하지 않음)
+- 비교 대상 기간: 업로드 데이터의 최신 월 vs 직전 월
+
+### 5-1. 검증용 예시 (fixture 정답)
+
+| | 8월 | 9월 | 변화 |
+|---|---|---|---|
+| 매출 | 10,400,000 | 12,600,000 | +21.2% |
+| 광고비 | 1,500,000 | 1,920,000 | +28.0% |
+| ROAS | 326.7% | 312.5% | −14.2%p |
+
+## 6. 이상 신호 명세
+
+| signal | 조건 | 포함 필드 |
+|---|---|---|
+| `ROAS_DOWN_WITH_SPEND_GROWTH` | ad_spend_change > 0 이고 roas_change_pp < 0 | ad_spend_change, ad_revenue_change, roas_change_pp |
+| `REVENUE_DOWN` | revenue_change < 0 | revenue_change |
+| `LOW_ROAS_PLATFORM` | 플랫폼 ROAS < 전체 ROAS × 0.8 | platform, roas, overall_roas |
+
+각 신호는 `platform` 필드(`all` 또는 플랫폼명)를 포함한다. 임계값은 `signals.py` 상수로 관리한다.
+
+## 7. API 명세
+
+### 7-1. 공통
+
+- Base URL: 환경변수 `NEXT_PUBLIC_API_BASE_URL`
+- 파일 제한: 최대 **10개**, 파일당 **5MB**, 확장자 `.xlsx`, `.csv`
+- 질문 길이: 최대 **300자**
+- 오류 응답 형식:
+
+```json
+{
+  "error": {
+    "code": "MISSING_COLUMNS",
+    "message": "coupang_2026-09.xlsx 파일에 '광고매출' 컬럼이 없습니다.",
+    "details": { "file": "coupang_2026-09.xlsx", "missing": ["광고매출"] }
+  }
+}
+```
+
+| code | HTTP | 설명 |
+|---|---|---|
+| `NO_FILES` | 400 | 업로드 파일 없음 |
+| `TOO_MANY_FILES` | 400 | 파일 개수 초과 |
+| `FILE_TOO_LARGE` | 413 | 파일 크기 초과 |
+| `UNSUPPORTED_FILE_TYPE` | 400 | 허용되지 않은 확장자 |
+| `EMPTY_FILE` | 422 | 데이터 행 없음 |
+| `MISSING_COLUMNS` | 422 | 필수 컬럼 누락 |
+| `INVALID_NUMBER` | 422 | 숫자 변환 실패 |
+| `UNKNOWN_PLATFORM` | 422 | 플랫폼 판별 불가 |
+| `QUESTION_TOO_LONG` | 400 | 질문 길이 초과 |
+| `INTERNAL_ERROR` | 500 | 기타 서버 오류 |
+
+### 7-2. `GET /health`
+
+```json
+{ "status": "ok" }
+```
+
+### 7-3. `POST /api/preview`
+
+- Content-Type: `multipart/form-data`
+- Body: `files` (복수)
+
+```json
+{
+  "files": [
+    {
+      "filename": "coupang_2026-09.xlsx",
+      "platform": "coupang",
+      "periods": ["2026-09"],
+      "row_count": 42,
+      "columns": ["총매출", "주문", "판매량", "광고비", "광고매출"],
+      "preview": [ { "product_name": "...", "총매출": 120000 } ]
+    }
+  ]
+}
+```
+
+`preview` 는 파일당 최대 10행.
+
+### 7-4. `POST /api/analyze`
+
+- Content-Type: `multipart/form-data`
+- Body: `files` (복수), `question` (선택, string)
+
+```json
+{
+  "kpis": {
+    "period": "2026-09",
+    "previous_period": "2026-08",
+    "current":  { "revenue": 12600000, "orders": 830, "units": 1020, "ad_spend": 1920000, "ad_revenue": 6000000, "roas": 312.5 },
+    "previous": { "revenue": 10400000, "orders": 700, "units": 860,  "ad_spend": 1500000, "ad_revenue": 4900000, "roas": 326.7 },
+    "change":   { "revenue_change": 21.2, "orders_change": 18.6, "units_change": 18.6, "ad_spend_change": 28.0, "ad_revenue_change": 22.4, "roas_change_pp": -14.2 }
+  },
+  "comparison": {
+    "by_platform": [
+      { "platform": "coupang", "revenue": 8000000, "orders": 520, "ad_spend": 1200000, "ad_revenue": 3500000, "roas": 291.7 },
+      { "platform": "naver",   "revenue": 4600000, "orders": 310, "ad_spend": 720000,  "ad_revenue": 2500000, "roas": 347.2 }
+    ],
+    "trend": [
+      { "period": "2026-08", "revenue": 10400000, "roas": 326.7 },
+      { "period": "2026-09", "revenue": 12600000, "roas": 312.5 }
+    ]
+  },
+  "rows": [ { "period": "2026-09", "platform": "coupang", "product_id": "P001", "product_name": "...", "revenue": 0, "orders": 0, "units": 0, "ad_spend": 0, "ad_revenue": 0 } ],
+  "signals": [
+    { "signal": "ROAS_DOWN_WITH_SPEND_GROWTH", "platform": "all", "ad_spend_change": 28.0, "ad_revenue_change": 22.4, "roas_change_pp": -14.2 }
+  ],
+  "insight": {
+    "status": "ok",
+    "plan": { "metric": "roas", "group_by": "platform", "sort": "asc" },
+    "answer": [ { "platform": "coupang", "roas": 291.7 } ],
+    "summary": "매출은 증가했지만 광고비 증가율이 광고매출 증가율보다 높아 ROAS가 하락했습니다.",
+    "evidence": ["광고비 +28.0%", "광고매출 +22.4%", "ROAS -14.2%p"],
+    "checks": ["어느 플랫폼에서 ROAS가 가장 크게 하락했는지 확인", "광고비 증가 대비 주문 증가폭 확인"],
+    "actions": ["저효율 플랫폼의 광고비를 우선 점검", "예산 조정 전 최근 추이를 추가 확인"],
+    "limitations": ["현재 데이터만으로 광고 소재·CTR·CPC·CVR 영향은 확인할 수 없습니다."]
+  }
+}
+```
+
+**필드 책임:** `kpis` / `comparison` / `rows` / `signals` → C, `insight` → D, 전체 조립 → B, 렌더링 → A
+
+**`insight.status`:**
+| 값 | 의미 | 프론트 처리 |
+|---|---|---|
+| `ok` | 정상 | 전체 표시 |
+| `unsupported_question` | 질문을 분석 계획으로 변환 불가 | 안내 문구 + 질문 예시 표시 |
+| `llm_error` | LLM 호출 실패/타임아웃/JSON 검증 실패 | KPI는 표시, AI 영역에 재시도 안내 |
+| `skipped` | 질문 없음 + 인사이트 미요청 | AI 영역 숨김 또는 기본 요약 |
+
+## 8. AI 모듈 명세 (D)
+
+### 8-1. Planner — 질문 → 분석 계획
+
+```json
+{
+  "metric": "revenue | orders | units | ad_spend | ad_revenue | roas",
+  "group_by": "platform | period | product | null",
+  "sort": "asc | desc | null",
+  "limit": 5,
+  "period": "YYYY-MM | null"
+}
+```
+
+- Pydantic 모델 `AnalysisPlan` 으로 검증, 허용되지 않은 값은 `unsupported_question`
+- LLM은 계획만 만들고, 실행은 `analysis/compare.run_plan(df, plan)` 이 수행
+
+### 8-2. Insight — 계산 결과 → 설명
+
+- 입력: `kpis`, `comparison`, `signals`, (선택) `plan` + `answer`
+- 출력: `summary`, `evidence`, `checks`, `actions`, `limitations` (Pydantic `Insight` 로 검증)
+- 프롬프트 규칙:
+  1. 입력에 있는 숫자만 사용, 숫자 재계산·변경 금지
+  2. 입력 데이터에 없는 요인(광고 소재, CTR, CPC, CVR, 경쟁사 가격, 시장 상황)을 원인으로 단정 금지 → `limitations` 에 "확인 불가 + 필요한 추가 데이터"로 기술
+  3. 원인은 "후보"로 표현
+  4. 한국어, 간결한 문장
+- 후처리 검증: `evidence` 의 숫자가 입력 KPI 값과 일치하는지 확인, 불일치 시 해당 항목 제거
+
+### 8-3. 실패 처리
+
+| 상황 | 처리 |
+|---|---|
+| 타임아웃 (15초) | `llm_error` |
+| JSON 파싱/검증 실패 | 1회 재시도 후 `llm_error` |
+| API 키 없음 | `llm_error` (서버 로그에 원인 기록) |
+
+## 9. Frontend 명세 (A)
+
+| 화면 영역 | 구성 | 데이터 |
+|---|---|---|
+| Upload | 파일 선택, 파일 목록(플랫폼·기간·행 수), 미리보기 표 | `/api/preview` |
+| KPI | 카드 6개 (값 + 전월 대비, 증가 녹색/감소 적색, ROAS는 %p) | `kpis` |
+| Platform Compare | 막대 차트 (플랫폼별 매출·ROAS) | `comparison.by_platform` |
+| Trend | 라인 차트 (기간별 매출·ROAS) | `comparison.trend` |
+| Signals | 경고 배지 목록 | `signals` |
+| Insight | 질문 입력, 요약, 근거 / 확인 항목 / 행동 제안 / 한계 | `insight` |
+
+- 숫자 포맷: 금액 `12,600,000원`, 비율 `+21.2%`, ROAS 증감 `-14.2%p`
+- 상태: `idle` / `uploading` / `analyzing` / `done` / `error`
+- 타입: `frontend/types/` 에 API 응답 타입 정의 (`shared/contracts` 기준)
+
+## 10. 환경변수
+
+| 변수 | 위치 | 설명 |
+|---|---|---|
+| `LLM_API_KEY` | Backend | LLM API 키 (절대 커밋 금지) |
+| `LLM_MODEL` | Backend | 사용할 모델명 |
+| `ALLOWED_ORIGINS` | Backend | CORS 허용 도메인 (쉼표 구분, Vercel URL 포함) |
+| `MAX_FILES` | Backend | 기본 10 |
+| `MAX_FILE_SIZE_MB` | Backend | 기본 5 |
+| `NEXT_PUBLIC_API_BASE_URL` | Frontend | Backend URL |
+
+각 앱에 `.env.example` 을 커밋하고 실제 `.env` 는 `.gitignore` 에 포함한다.
+
+## 11. 배포
+
+| 대상 | 플랫폼 | 설정 |
+|---|---|---|
+| Frontend | Vercel | Root: `frontend/`, env: `NEXT_PUBLIC_API_BASE_URL` |
+| Backend | Render (Web Service) | Root: `backend/`, Build: `pip install -r requirements.txt`, Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+
+- Render 무료 플랜 콜드 스타트 대비: 시연 전 `/health` 호출로 워밍업
+
+## 12. 테스트 전략
+
+| 레벨 | 담당 | 내용 |
+|---|---|---|
+| 단위 (analysis) | C | fixture 입력 → KPI·비교·신호 정답 비교 |
+| 단위 (ai) | D | 질문 세트 → 계획 JSON 검증, 숫자 불변·과잉 추론 금지 검증, LLM 실패 모킹 |
+| API | B | 정상/실패 케이스별 상태코드·오류 코드 확인 |
+| 통합 (E2E) | 전원 | 배포 환경에서 업로드 → KPI → 질문 → 인사이트 |
+
+**실패 테스트 케이스:** 빈 파일, 누락 컬럼, 잘못된 숫자, LLM 장애, 잘못된 질문, 파일 크기 초과, 파일 개수 초과, 미지원 확장자
+
+## 13. Git 규칙
+
+- Branch: `feat/<영역>-<내용>`, `fix/<영역>-<내용>` (예: `feat/fe-upload`, `feat/data-kpi`)
+- Commit: `feat:`, `fix:`, `docs:`, `test:`, `refactor:` 접두사
+- PR: 작게, 리뷰어 1명 승인 후 Merge (A→B, B→C, C→D, D→A)
+- `shared/contracts/` 변경 PR은 전원 확인

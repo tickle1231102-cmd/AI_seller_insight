@@ -1,0 +1,333 @@
+# WORK_UNITS — 단위 작업 명세
+
+| 항목 | 내용 |
+|---|---|
+| 문서 | 단위 작업 명세 및 작업별 완료 조건 |
+| 정리 | B (각 담당자가 자기 작업 작성) |
+| 관련 문서 | [PRD.md](PRD.md), [TECH_SPEC.md](TECH_SPEC.md), [FINAL_CHECKLIST.md](FINAL_CHECKLIST.md) |
+
+**사용법**
+- 작업 ID 형식: `WU-<영역>-<번호>` (COM=공통, FE=A, BE=B, DA=C, AI=D, INT=통합)
+- 모든 완료 조건이 체크되어야 해당 작업을 완료로 본다.
+- PR 설명에 작업 ID를 적고, Merge 시 체크박스를 갱신한다.
+
+## 작업 요약
+
+| ID | 작업 | 담당 | 리뷰 | Day | 선행 |
+|---|---|---|---|---|---|
+| WU-COM-01 | 공통 데이터 구조 · API 계약 확정 | 전원 (B 정리) | 전원 | 1 | — |
+| WU-COM-02 | 저장소 · 협업 환경 구성 | B | A | 1 | — |
+| WU-COM-03 | 프로젝트 뼈대 생성 | A, B | C | 1 | COM-02 |
+| WU-DA-01 | 테스트 fixture 제작 | C | D | 1–2 | COM-01 |
+| WU-FE-01 | 파일 업로드 UI | A | B | 2 | COM-03 |
+| WU-FE-02 | KPI 대시보드 UI | A | B | 2 | COM-01 |
+| WU-BE-01 | FastAPI 서버 · 설정 · CORS | B | C | 2 | COM-03 |
+| WU-BE-02 | Pydantic 스키마 | B | C | 2 | COM-01 |
+| WU-BE-03 | 파일 업로드 검증 · `/api/preview` | B | C | 2 | BE-01, DA-02 |
+| WU-DA-02 | 플랫폼 데이터 정규화 | C | D | 2 | DA-01 |
+| WU-DA-03 | KPI 계산 | C | D | 2 | DA-02 |
+| WU-AI-01 | LLM 클라이언트 · 실패 처리 | D | A | 2 | COM-03 |
+| WU-AI-02 | 질문 → 분석 계획 JSON (Planner) | D | A | 2 | AI-01 |
+| WU-DA-04 | 전월 · 플랫폼 비교 / 계획 실행 | C | D | 3 | DA-03, AI-02 |
+| WU-DA-05 | 이상 신호 계산 | C | D | 3 | DA-04 |
+| WU-AI-03 | KPI 인사이트 생성 | D | A | 3 | AI-01, DA-05 |
+| WU-BE-04 | `/api/analyze` · 모듈 연결 | B | C | 3 | BE-03, DA-05, AI-03 |
+| WU-FE-03 | 실제 API 연결 | A | B | 3 | BE-03, FE-01 |
+| WU-FE-04 | 차트 (플랫폼 비교 · 추이) | A | B | 3 | FE-02 |
+| WU-FE-05 | AI 질문 · 인사이트 UI | A | B | 3 | FE-03 |
+| WU-FE-06 | 로딩 · 오류 · 반응형 | A | B | 3–4 | FE-03 |
+| WU-BE-05 | 오류 처리 통일 | B | C | 3–4 | BE-04 |
+| WU-AI-04 | AI 품질 테스트 (과잉 추론 방지) | D | A | 4 | AI-03 |
+| WU-DA-06 | 데이터 · 실패 케이스 QA | C | D | 4 | BE-04 |
+| WU-BE-06 | 배포 (Render · Vercel 연결) | B | C | 4 | BE-04, FE-03 |
+| WU-INT-01 | 전체 통합 E2E 검증 | 전원 | 전원 | 4 | BE-06 |
+| WU-INT-02 | 문서 · 발표 · 제출 | 전원 | 전원 | 5 | INT-01 |
+
+---
+
+## Day 1 — 공통 기반
+
+### WU-COM-01 공통 데이터 구조 · API 계약 확정
+- **담당:** 전원 (B 정리) · **리뷰:** 전원
+- **내용:** 정규화 스키마 9개 필드, 플랫폼 컬럼 매핑, `/api/analyze` 응답 구조, 오류 코드 확정 후 `shared/contracts/` 에 기록
+
+**완료 조건**
+- [ ] `shared/contracts/` 에 공통 데이터 스키마(9개 필드, 타입, 단위) 문서화
+- [ ] 쿠팡·네이버 → 공통 필드 매핑 표 확정
+- [ ] `/api/preview`, `/api/analyze` 응답 JSON 예시 파일 커밋
+- [ ] 오류 코드 목록 확정
+- [ ] 4명 전원이 PR에 승인(Approve) 표시
+
+### WU-COM-02 저장소 · 협업 환경 구성
+- **담당:** B · **리뷰:** A
+
+**완료 조건**
+- [ ] Collaborator 3명 초대 완료, 4명 모두 Clone 성공
+- [ ] `main` 브랜치 보호 규칙 설정 (PR 필수, 승인 1명 이상)
+- [ ] `.gitignore` 에 `.env`, `node_modules/`, `.venv/`, `__pycache__/` 포함
+- [ ] 4명 모두 Branch → PR → Review → Merge 1회 이상 경험
+
+### WU-COM-03 프로젝트 뼈대 생성
+- **담당:** A (frontend), B (backend) · **리뷰:** C
+
+**완료 조건**
+- [ ] `frontend/` Next.js + TypeScript 프로젝트 생성, `npm run dev` 로 기본 화면 표시
+- [ ] `backend/` FastAPI 프로젝트 생성, `requirements.txt` 작성
+- [ ] `backend/app/{routers,core,analysis,ai}` 폴더 및 빈 모듈 생성
+- [ ] `GET /health` → `{"status":"ok"}` 응답
+- [ ] 각 앱에 `.env.example` 커밋
+- [ ] README 의 실행 방법대로 다른 팀원이 로컬 실행 성공
+
+### WU-DA-01 테스트 fixture 제작
+- **담당:** C · **리뷰:** D
+
+**완료 조건**
+- [ ] `shared/fixtures/` 에 쿠팡 8월·9월, 네이버 8월·9월 샘플 파일 (xlsx 또는 csv)
+- [ ] 정답 파일 (`expected_kpis.json`) 에 전체·플랫폼별 KPI 및 변화율 기록
+- [ ] 정답이 TECH_SPEC 5-1 예시(매출 +21.2%, 광고비 +28.0%, ROAS −14.2%p)와 일치
+- [ ] 실패용 fixture: 빈 파일, 컬럼 누락, 잘못된 숫자, 미지원 플랫폼 각 1개
+
+---
+
+## Day 2 — 담당별 개발
+
+### WU-FE-01 파일 업로드 UI
+- **담당:** A · **리뷰:** B
+
+**완료 조건**
+- [ ] 여러 `.xlsx`/`.csv` 파일을 한 번에 선택 가능
+- [ ] 선택된 파일 목록(파일명, 크기) 표시, 개별 삭제 가능
+- [ ] 허용되지 않은 확장자는 선택 단계에서 안내
+- [ ] 미리보기 표 컴포넌트가 mock 데이터(계약 예시 JSON)로 렌더링
+
+### WU-FE-02 KPI 대시보드 UI
+- **담당:** A · **리뷰:** B
+
+**완료 조건**
+- [ ] KPI 카드 6개 (매출, 주문, 판매량, 광고비, 광고매출, ROAS) 렌더링
+- [ ] 전월 대비 변화 표시, 증가/감소 색상 구분, ROAS는 `%p` 표기
+- [ ] 금액 천 단위 콤마 + `원` 표기
+- [ ] 계약 예시 JSON(mock)으로 전체 화면 렌더링 확인
+- [ ] 값이 `null` 인 경우 `-` 로 표시
+
+### WU-BE-01 FastAPI 서버 · 설정 · CORS
+- **담당:** B · **리뷰:** C
+
+**완료 조건**
+- [ ] `core/config.py` 에서 환경변수 로드 (`LLM_API_KEY`, `ALLOWED_ORIGINS`, `MAX_FILES`, `MAX_FILE_SIZE_MB`)
+- [ ] CORS 가 `ALLOWED_ORIGINS` 기반으로 설정, 로컬 프론트에서 `/health` 호출 성공
+- [ ] 라우터 분리 (`routers/health.py`, `preview.py`, `analyze.py`)
+- [ ] `/docs` (Swagger) 접근 가능
+
+### WU-BE-02 Pydantic 스키마
+- **담당:** B · **리뷰:** C
+
+**완료 조건**
+- [ ] `schemas.py` 에 `PreviewResponse`, `AnalyzeResponse`, `KPIs`, `Comparison`, `Row`, `Signal`, `Insight`, `ErrorResponse` 정의
+- [ ] `shared/contracts/` 의 예시 JSON 이 스키마 검증을 통과하는 테스트 존재
+- [ ] 라우터 응답에 `response_model` 적용
+
+### WU-BE-03 파일 업로드 검증 · `/api/preview`
+- **담당:** B · **리뷰:** C
+
+**완료 조건**
+- [ ] 파일 0개 → `NO_FILES`, 개수 초과 → `TOO_MANY_FILES`, 크기 초과 → `FILE_TOO_LARGE`, 확장자 오류 → `UNSUPPORTED_FILE_TYPE`
+- [ ] 정상 파일에 대해 파일별 `platform`, `periods`, `row_count`, `columns`, `preview`(최대 10행) 반환
+- [ ] C 의 정규화 오류(`MISSING_COLUMNS` 등)가 오류 응답 형식으로 전달
+- [ ] `tests/test_api.py` 에 위 케이스 테스트 통과
+
+### WU-DA-02 플랫폼 데이터 정규화
+- **담당:** C · **리뷰:** D
+
+**완료 조건**
+- [ ] `normalize.py` 에 `PLATFORM_COLUMN_MAP` 상수 (쿠팡·네이버)
+- [ ] xlsx·csv 모두 읽기 가능 (UTF-8, CP949 인코딩 CSV 처리)
+- [ ] 플랫폼 자동 판별 (컬럼 구조 기준, 불가 시 `UNKNOWN_PLATFORM`)
+- [ ] 숫자 정제 (`,`, `원`, 공백 제거), 실패 시 `INVALID_NUMBER` (파일·행·컬럼 정보 포함)
+- [ ] 필수 컬럼 누락 시 `MISSING_COLUMNS` (누락 목록 포함), 빈 파일 `EMPTY_FILE`
+- [ ] 출력 DataFrame 이 공통 스키마 9개 필드와 타입을 정확히 가짐
+- [ ] `test_analysis.py` 에 정상 4종 + 실패 4종 테스트 통과
+
+### WU-DA-03 KPI 계산
+- **담당:** C · **리뷰:** D
+
+**완료 조건**
+- [ ] `kpi.py` 에서 매출·주문·판매량·광고비·광고매출 합계, ROAS 계산
+- [ ] 광고비 0 → ROAS `null`
+- [ ] 기간·플랫폼 단위 집계 가능
+- [ ] fixture 기준 결과가 `expected_kpis.json` 과 정확히 일치
+- [ ] 같은 입력으로 반복 실행 시 결과 동일
+
+### WU-AI-01 LLM 클라이언트 · 실패 처리
+- **담당:** D · **리뷰:** A
+
+**완료 조건**
+- [ ] `ai/` 내 LLM 호출 함수가 API 키를 환경변수로만 읽음
+- [ ] 타임아웃(15초) 적용
+- [ ] JSON 파싱/검증 실패 시 1회 재시도 후 `llm_error` 반환
+- [ ] API 키 없음·네트워크 오류 시 예외가 밖으로 새지 않고 `llm_error` 반환
+- [ ] 실패 경로를 모킹한 테스트 통과
+
+### WU-AI-02 질문 → 분석 계획 JSON (Planner)
+- **담당:** D · **리뷰:** A
+
+**완료 조건**
+- [ ] `planner.py` 가 질문 → `AnalysisPlan` (`metric`, `group_by`, `sort`, `limit`, `period`) 반환
+- [ ] 허용 값 외 출력은 Pydantic 검증에서 걸러져 `unsupported_question`
+- [ ] 테스트 질문 세트 최소 10개 작성 (`prompts/` 또는 `tests/`)
+- [ ] 테스트 질문 세트 90% 이상 올바른 계획 생성
+  - 예: "광고 효율이 가장 안 좋은 플랫폼 어디야?" → `{"metric":"roas","group_by":"platform","sort":"asc"}`
+- [ ] 분석과 무관한 질문(예: "오늘 날씨")은 `unsupported_question`
+
+---
+
+## Day 3 — 기능 확장 · 연결
+
+### WU-DA-04 전월 · 플랫폼 비교 / 계획 실행
+- **담당:** C · **리뷰:** D
+
+**완료 조건**
+- [ ] `compare.py` 에서 최신 월 vs 직전 월 증감률(%) 및 ROAS 증감(%p) 계산
+- [ ] 전월 값 0 → 증감률 `null`
+- [ ] 데이터가 한 달뿐이면 `change` 는 `null`, 오류 없이 반환
+- [ ] `by_platform`, `trend` 생성
+- [ ] `run_plan(df, plan)` 이 `AnalysisPlan` 을 받아 정렬·그룹·limit 적용 결과 반환
+- [ ] fixture 결과가 매출 +21.2%, 광고비 +28.0%, ROAS −14.2%p 로 일치
+
+### WU-DA-05 이상 신호 계산
+- **담당:** C · **리뷰:** D
+
+**완료 조건**
+- [ ] `signals.py` 에 `ROAS_DOWN_WITH_SPEND_GROWTH`, `REVENUE_DOWN`, `LOW_ROAS_PLATFORM` 구현
+- [ ] 임계값이 상수로 분리됨
+- [ ] 각 신호가 TECH_SPEC 6장의 필드를 포함
+- [ ] fixture 에서 `ROAS_DOWN_WITH_SPEND_GROWTH` 가 `ad_spend_change: 28.0`, `ad_revenue_change: 22.4`, `roas_change_pp: -14.2` 로 감지
+- [ ] 조건 미충족 데이터에서 신호가 발생하지 않는 테스트 통과
+
+### WU-AI-03 KPI 인사이트 생성
+- **담당:** D · **리뷰:** A
+
+**완료 조건**
+- [ ] `insight.py` 가 `kpis`, `comparison`, `signals`, (선택) `plan`/`answer` 를 받아 `Insight` 반환
+- [ ] 출력이 `summary`, `evidence`, `checks`, `actions`, `limitations` 로 분리
+- [ ] 프롬프트에 "숫자 변경 금지", "데이터에 없는 원인 단정 금지", "원인은 후보로 표현" 규칙 포함
+- [ ] 후처리: `evidence` 숫자가 입력 KPI 와 불일치하면 제거
+- [ ] fixture 입력에 대해 "광고비 증가율이 광고매출 증가율보다 높아 ROAS 하락" 취지의 설명 생성
+
+### WU-BE-04 `/api/analyze` · 모듈 연결
+- **담당:** B · **리뷰:** C
+
+**완료 조건**
+- [ ] 처리 흐름(TECH_SPEC 1장 1~9단계)대로 C·D 모듈 호출
+- [ ] 응답이 `AnalyzeResponse` 스키마 검증 통과
+- [ ] `question` 없이 호출 가능, 300자 초과 시 `QUESTION_TOO_LONG`
+- [ ] LLM 실패 시에도 `kpis`/`comparison`/`rows`/`signals` 는 정상, `insight.status = "llm_error"`
+- [ ] fixture 4개 업로드 시 기대 KPI 반환 테스트 통과
+
+### WU-FE-03 실제 API 연결
+- **담당:** A · **리뷰:** B
+
+**완료 조건**
+- [ ] `lib/api/` 에 `preview`, `analyze` 클라이언트 함수 (`NEXT_PUBLIC_API_BASE_URL` 사용)
+- [ ] `types/` 의 응답 타입이 계약과 일치
+- [ ] 업로드 → `/api/preview` 결과로 파일 목록·플랫폼·기간·미리보기 표시
+- [ ] 분석 버튼 → `/api/analyze` 결과로 KPI 카드 표시
+- [ ] mock 데이터 의존 코드 제거
+
+### WU-FE-04 차트 (플랫폼 비교 · 추이)
+- **담당:** A · **리뷰:** B
+
+**완료 조건**
+- [ ] Recharts 플랫폼 비교 차트 (`comparison.by_platform` 의 매출·ROAS)
+- [ ] Recharts 기간 추이 차트 (`comparison.trend` 의 매출·ROAS)
+- [ ] 툴팁에 포맷된 값 표시
+- [ ] 데이터가 한 기간뿐이어도 오류 없이 표시
+- [ ] 이상 신호(`signals`) 배지 표시
+
+### WU-FE-05 AI 질문 · 인사이트 UI
+- **담당:** A · **리뷰:** B
+
+**완료 조건**
+- [ ] 질문 입력창 (300자 제한, 글자 수 표시) 및 예시 질문 버튼
+- [ ] `summary`, `evidence`, `checks`, `actions`, `limitations` 가 구분된 섹션으로 표시
+- [ ] `answer` 결과 표 표시
+- [ ] `insight.status` 별 처리: `unsupported_question` → 예시 안내, `llm_error` → 재시도 안내 (KPI 영역은 유지)
+
+### WU-FE-06 로딩 · 오류 · 반응형
+- **담당:** A · **리뷰:** B
+
+**완료 조건**
+- [ ] 업로드·분석·AI 응답 중 로딩 표시, 중복 요청 방지 (버튼 비활성화)
+- [ ] 오류 코드별 사용자 메시지 표시 (최소 `FILE_TOO_LARGE`, `TOO_MANY_FILES`, `MISSING_COLUMNS`, `INVALID_NUMBER`, `EMPTY_FILE`, 네트워크 오류)
+- [ ] 모바일 폭(375px)에서 가로 스크롤 없이 주요 화면 확인 가능
+- [ ] 콘솔 에러 없음
+
+### WU-BE-05 오류 처리 통일
+- **담당:** B · **리뷰:** C
+
+**완료 조건**
+- [ ] `core/errors.py` 에 도메인 예외 → HTTP 응답 변환 핸들러
+- [ ] 모든 오류가 `{"error":{"code","message","details"}}` 형식
+- [ ] 예상치 못한 예외는 `INTERNAL_ERROR` (스택트레이스 응답 노출 금지, 서버 로그 기록)
+- [ ] TECH_SPEC 7-1 오류 코드 전체에 대한 API 테스트 통과
+
+---
+
+## Day 4 — 통합 · 검증 · 배포
+
+### WU-AI-04 AI 품질 테스트 (과잉 추론 방지)
+- **담당:** D · **리뷰:** A
+
+**완료 조건**
+- [ ] `tests/test_ai.py` 에 인사이트 품질 테스트 세트 (최소 5개 시나리오)
+- [ ] 모든 시나리오에서 응답 내 숫자가 입력 KPI 와 일치 (숫자 변조 0건)
+- [ ] 금지 원인어(광고 소재, CTR, CPC, CVR, 경쟁사, 시장 상황)가 단정 표현으로 등장하지 않음 (0건)
+- [ ] 해당 요인 언급 시 `limitations` 에 "확인 불가 + 추가 데이터 필요"로 기술
+- [ ] 테스트 결과를 `DevelopDoc/` 에 기록 (AI 활용 사례 포함)
+
+### WU-DA-06 데이터 · 실패 케이스 QA
+- **담당:** C · **리뷰:** D
+
+**완료 조건**
+- [ ] 실패 테스트 전 항목 확인: 빈 파일, 누락 컬럼, 잘못된 숫자, 파일 크기 초과, 파일 개수 초과, 미지원 확장자, 미지원 플랫폼
+- [ ] 각 케이스가 API 에서 올바른 오류 코드 반환
+- [ ] 각 케이스가 화면에서 이해 가능한 메시지로 표시
+- [ ] 실제 형식에 가까운 샘플 데이터로 KPI 수기 검산 1회 이상
+- [ ] 테스트 결과 기록
+
+### WU-BE-06 배포 (Render · Vercel 연결)
+- **담당:** B · **리뷰:** C
+
+**완료 조건**
+- [ ] Render 에 Backend 배포, 배포 URL `/health` 정상
+- [ ] Render 환경변수(`LLM_API_KEY`, `LLM_MODEL`, `ALLOWED_ORIGINS`) 설정
+- [ ] Vercel 에 Frontend 배포, `NEXT_PUBLIC_API_BASE_URL` 이 Render URL
+- [ ] 배포된 Frontend 에서 CORS 오류 없이 `/api/analyze` 호출 성공
+- [ ] 저장소·빌드 로그·프론트 번들에 API 키 노출 없음
+- [ ] 배포 URL 을 README 에 기재
+
+### WU-INT-01 전체 통합 E2E 검증
+- **담당:** 전원 · **리뷰:** 전원
+
+**완료 조건**
+- [ ] 배포 환경에서 fixture 4개 업로드 → 미리보기 → 분석 → KPI → 차트 → 신호 → 질문 → 인사이트 흐름 성공
+- [ ] 화면 KPI 값이 `expected_kpis.json` 과 일치
+- [ ] LLM 장애 상황(키 제거 등)에서 KPI 는 표시되고 AI 영역만 오류 안내
+- [ ] 실패 케이스 6종(빈 파일, 누락 컬럼, 잘못된 숫자, LLM 장애, 잘못된 질문, 파일 크기 초과) 시연 가능
+- [ ] 발견 버그는 Issue 로 등록 후 수정 PR Merge
+
+---
+
+## Day 5 — 제출
+
+### WU-INT-02 문서 · 발표 · 제출
+- **담당:** 전원 · **리뷰:** 전원
+- **원칙:** Day 5 에는 새 기능을 추가하지 않는다 (버그 수정만).
+
+**완료 조건**
+- [ ] README 최신화 (배포 URL, 실행 방법, 스크린샷)
+- [ ] PRD / TECH_SPEC 가 실제 구현과 일치하도록 갱신
+- [ ] WORK_UNITS 의 모든 체크박스 상태 갱신
+- [ ] FINAL_CHECKLIST 전 항목 확인
+- [ ] 발표 자료 및 시연 시나리오 준비, 리허설 1회
+- [ ] 최종 배포 버전 태그 (`v1.0.0`) 생성 및 제출
