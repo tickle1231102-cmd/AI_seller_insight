@@ -16,7 +16,7 @@
 | 필드 | 타입 | 설명 |
 |---|---|---|
 | `period` | string (`YYYY-MM`) | 기간 |
-| `platform` | `coupang` \| `naver` | 플랫폼 |
+| `platform` | `coupang` \| `naver` \| `naver_store` | 플랫폼 (`naver_store`: 스마트스토어 판매 분석, TECH_SPEC 4-3) |
 | `product_id` | string | 상품 ID |
 | `product_name` | string | 상품명 |
 | `revenue` | number (원) | 매출 |
@@ -38,8 +38,9 @@
 | `product_name` | 상품명 | 상품명 |
 | `period` | 파일명의 `_YYYY-MM` | 파일명의 `_YYYY-MM` |
 
-> `period` 는 원본 컬럼이 아니라 **파일명**에서 뽑는다 (예: `coupang_2026-09.csv` → `2026-09`). 규칙은 `\d{4}-(0[1-9]|1[0-2])` 이고, 없으면 `INVALID_PERIOD` 오류.
+> `period` 는 원본 컬럼이 아니라 **파일명**에서 뽑는다 (예: `coupang_2026-09.csv` → `2026-09`). 규칙은 `\d{4}-(0[1-9]|1[0-2])` 이고, 없으면 날짜 범위(`sales_20260830-20260928.xlsx` → 중간이 속한 `2026-09`)를 쓰고, 그것도 없으면 `INVALID_PERIOD` 오류. 스마트스토어 판매 파일은 행의 `날짜` 범위가 먼저다.
 > 플랫폼은 파일명이 아니라 **컬럼 구조**로 판별한다 (지표 컬럼 5개 중 3개 이상 일치하는 쪽, 동률·미달이면 `UNKNOWN_PLATFORM`).
+> 스마트스토어 판매 분석(SALES) 파일은 컬럼 `채널상품번호`·`채널상품명`·`판매금액(총)` 으로 판별해 `platform="naver_store"` 로 분리한다. 광고 리포트와 판매액이 겹칠 수 있어 `kpis`·`comparison`·`signals`·`run_plan` 에는 넣지 않고 `rows`·`store` 에만 나온다. 셀 값 `-` 는 이 파일에서만 0 이다 (그 외는 `INVALID_NUMBER`).
 > 금액 필드(`revenue`, `ad_spend`, `ad_revenue`)는 정규화 단계에서 반올림해 정수(원)로 맞춘다.
 > `preview_file` 의 `columns` 는 맨 앞이 `product_name` 이고 그 뒤가 원본 지표 컬럼명이다. 프론트 미리보기 표가 `columns` 를 행의 키로 쓰기 때문이다.
 
@@ -59,7 +60,8 @@
 | `MISSING_COLUMNS` | 422 | `file`, `missing` |
 | `INVALID_NUMBER` | 422 | `file`, `row`, `column`, `value` (`row` 는 헤더를 뺀 데이터 행 기준 1부터) |
 | `UNKNOWN_PLATFORM` | 422 | `file` |
-| `INVALID_PERIOD` | 422 | `file` (파일명에서 `_YYYY-MM` 기간을 찾지 못함) |
+| `INVALID_PERIOD` | 422 | `file` (파일명에서 `_YYYY-MM` 또는 날짜 범위 기간을 찾지 못함) |
+| `UNSUPPORTED_DATASET` | 422 | `file`, `dataset` (`visit`\|`query`\|`customer`; 스마트스토어 판매 분석 외 파일) |
 | `QUESTION_TOO_LONG` | 400 | `max_length` |
 | `NOT_FOUND` | 404 | — (없는 주소) |
 | `METHOD_NOT_ALLOWED` | 405 | — (잘못된 요청 방식) |

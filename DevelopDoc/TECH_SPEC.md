@@ -89,7 +89,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 │  │  │  └─ signals.py
 │  │  └─ ai/                      ← D
 │  │     ├─ client.py             # OpenAI 호출 · 타임아웃 · 재시도
-│  │     ├─ models.py             # AnalysisPlan, PlannerResult, Insight
+│  │     ├─ models.py             # AnalysisPlan, PlannerResult, InsightDraft(LLM 생성용), Insight(응답용)
 │  │     ├─ planner.py
 │  │     ├─ insight.py
 │  │     └─ prompts/
@@ -111,7 +111,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | 필드 | 타입 | 설명 |
 |---|---|---|
 | `period` | string (`YYYY-MM`) | 기간 (원본 컬럼이 아니라 **파일명**의 `YYYY-MM` 에서 추출. 앞뒤에 숫자가 붙지 않은 것, 예: `coupang_2026-09.csv`) |
-| `platform` | string (`coupang` \| `naver`) | 플랫폼 |
+| `platform` | string (`coupang` \| `naver` \| `naver_store`) | 플랫폼 (`naver_store` 는 4-3 참고) |
 | `product_id` | string | 상품 ID |
 | `product_name` | string | 상품명 |
 | `revenue` | integer (원) | 매출 |
@@ -143,7 +143,19 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 - 데이터 행 0개 → `EMPTY_FILE` 오류
 - 빈 숫자 셀 → 0 으로 처리
 - 금액·수량 5개 필드(`revenue`, `orders`, `units`, `ad_spend`, `ad_revenue`)는 정수로 반올림 (Python `round` 라 `.5` 는 짝수 쪽으로)
-- 파일명에서 `YYYY-MM` 을 찾지 못함 → `INVALID_PERIOD` 오류
+- 파일명에서 기간을 찾지 못함 → `INVALID_PERIOD` 오류. 기간은 `YYYY-MM` 이 우선이고, 없으면 날짜 범위(`YYYYMMDD-YYYYMMDD` 등, 첫·끝 날짜의 중간이 속한 월)를 쓴다. 예: `sales_20260830-20260928.xlsx` → `2026-09`
+- 셀 값 `-` 는 스마트스토어 판매 분석 파일에서만 0 으로 본다. 그 외 파일에서는 `INVALID_NUMBER`
+
+### 4-3. 스마트스토어 판매 분석 (`naver_store`)
+
+네이버 스마트스토어 통계 > 판매 분석(SALES) 내보내기 파일을 올리면 `platform="naver_store"` 로 정규화한다. 광고 리포트(`naver`)와 같은 판매액이 겹칠 수 있으므로 **합산하지 않고 분리**한다.
+
+- 판별: 컬럼에 `채널상품번호`, `채널상품명`, `판매금액(총)` 이 모두 있으면 스토어 판매 파일이다.
+- 매핑: `revenue`=판매금액(순), `orders`=상품결제건수, `units`=결제상품수량. `ad_spend`·`ad_revenue` 는 0. 추가 지표 `gross_revenue`(판매금액(총)), `visits`(방문수), `refund_count`, `refund_amount`, `discount_amount`(전체 할인액) 는 스토어 행에만 값이 있다 (그 외 행은 응답에서 필드 자체가 빠진다).
+- 기간: 행의 `날짜` 범위 중간이 속한 월, 없으면 파일명. 일자별 행은 월·상품별로 합친다.
+- **`kpis`·`comparison`·`signals`·질문 실행(`run_plan`)은 `naver_store` 행을 제외하고 계산**한다. `rows` 와 `store` 에만 나온다. 스토어 파일만 올리면 제외할 행이 없으므로 그 행으로 계산한다.
+- `store` (응답 최상위, 스토어 파일이 없으면 `null`): 스토어 데이터의 최신 월·직전 월 기준 `current`/`previous`/`change`(퍼널·환불률·할인율·객단가), 상품별 `products`(최대 10개), `trend`.
+- 방문·검색어·고객 분석 파일은 아직 지원하지 않으며 `UNSUPPORTED_DATASET` 오류를 낸다 (P1).
 
 ## 5. KPI 계산 명세
 
@@ -209,7 +221,8 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | `MISSING_COLUMNS` | 422 | 필수 컬럼 누락 |
 | `INVALID_NUMBER` | 422 | 숫자 변환 실패 |
 | `UNKNOWN_PLATFORM` | 422 | 플랫폼 판별 불가 |
-| `INVALID_PERIOD` | 422 | 파일명에서 `YYYY-MM` 기간을 찾지 못함 |
+| `UNSUPPORTED_DATASET` | 422 | 스마트스토어 방문·검색어·고객 분석 파일 (판매 분석만 지원) |
+| `INVALID_PERIOD` | 422 | 파일명에서 기간(`YYYY-MM` 또는 날짜 범위)을 찾지 못함 |
 | `QUESTION_TOO_LONG` | 400 | 질문 길이 초과 |
 | `NOT_FOUND` | 404 | 없는 주소 |
 | `METHOD_NOT_ALLOWED` | 405 | 잘못된 요청 방식 |
@@ -217,7 +230,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | `HTTP_ERROR` | 원래 상태 코드 | 위에 없는 그 밖의 프레임워크 HTTP 오류 |
 | `INTERNAL_ERROR` | 500 | 기타 서버 오류 (스택트레이스는 응답에 노출하지 않고 서버 로그에만 기록) |
 
-- 모든 오류는 위 `{"error":{code,message,details}}` 형식이며, 500 을 포함한 모든 오류 응답에 CORS 헤더가 붙는다.
+- 모든 오류는 위 `{"error":{code,message,details}}` 형식이다. **허용된 Origin(`ALLOWED_ORIGINS`)에서 보낸 요청**에는 500 을 포함한 오류 응답에도 CORS 헤더가 붙는다. Origin 이 없거나 허용되지 않은 Origin 이면 `Access-Control-Allow-Origin` 은 붙지 않는다.
 - 오류별 `details` 키는 [`shared/contracts/README.md`](../shared/contracts/README.md) 2장 참고.
 
 ### 7-2. `GET /health`
@@ -297,7 +310,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | `ok` | 정상 | 전체 표시 |
 | `unsupported_question` | 질문을 분석 계획으로 변환 불가 | 안내 문구 + 질문 예시 표시 |
 | `llm_error` | LLM 호출 실패/타임아웃/JSON 검증 실패, API 키 없음, 계획 실행(`run_plan`) 중 예상 못 한 오류 | KPI는 표시, AI 영역에 재시도 안내 |
-| `skipped` | 예약된 값. 현재 백엔드는 보내지 않음 (질문이 없어도 인사이트를 생성) | AI 영역 숨김 |
+| `skipped` | 예약된 값. 현재 서버는 **반환하지 않음** (질문이 없어도 인사이트를 생성하고, LLM 이 정할 수 있는 `status` 는 `InsightDraft` 의 `ok`·`unsupported_question` 뿐 — 8-2 참고) | AI 영역 숨김 |
 
 - 질문이 없으면 계획(`plan`)·답(`answer`) 없이 KPI 요약 인사이트를 만든다.
 - `unsupported_question` 이면 `summary` 에 사용자에게 보여 줄 이유가 담긴다 (예: 데이터에 없는 월을 물으면 업로드된 기간 안내).
@@ -323,6 +336,9 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 
 - 입력: `kpis`, `comparison`, `signals`, (선택) `plan` + `answer`
 - 출력: `summary`, `evidence`, `checks`, `actions`, `limitations` (Pydantic `Insight` 로 검증)
+- LLM 은 `InsightDraft`(`status`, `summary`, `evidence`, `checks`, `actions`, `limitations`, `reason`)만 생성한다. `status` 는 `ok` / `unsupported_question` 만 허용된다.
+- `plan`·`answer` 는 LLM 이 만들지 않고, 서버가 위에서 계산한 값을 붙여 최종 `Insight` 를 만든다 (LLM 이 계산 결과를 바꾸지 못하게 하기 위함).
+- LLM 호출이 실패하면 `Insight(status="llm_error")` 를 반환한다.
 - 프롬프트 규칙:
   1. 입력에 있는 숫자만 사용, 숫자 재계산·변경 금지
   2. 입력 데이터에 없는 요인(광고 소재, CTR, CPC, CVR, 경쟁사 가격, 시장 상황)을 원인으로 단정 금지 → `limitations` 에 "확인 불가 + 필요한 추가 데이터"로 기술
@@ -334,7 +350,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 
 | 상황 | 처리 |
 |---|---|
-| 타임아웃 (15초) | `llm_error` |
+| 타임아웃 (`LLM_TIMEOUT_SECONDS`, 기본 30초) | `llm_error` |
 | JSON 파싱/검증 실패 | 1회 재시도 후 `llm_error` |
 | API 키 없음 | `llm_error` (서버 로그에 원인 기록) |
 
@@ -357,9 +373,9 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 
 | 변수 | 위치 | 설명 |
 |---|---|---|
-| `LLM_API_KEY` | Backend | LLM API 키 (절대 커밋 금지). 현재 `ai/client.py` 는 `OPENAI_API_KEY` 도 읽음 — 하나로 통일 예정 |
+| `LLM_API_KEY` | Backend | LLM API 키 (절대 커밋 금지). 현재 `ai/client.py` 는 `OPENAI_API_KEY` 를 **우선** 읽고, 없으면 `LLM_API_KEY` 를 읽음 — 하나로 통일 예정 |
 | `LLM_MODEL` | Backend | 사용할 모델명 |
-| `LLM_TIMEOUT_SECONDS` | Backend | LLM 호출 타임아웃, 기본 15. ⚠️ 현재 `ai/client.py` 는 15초 고정이라 이 값이 반영되지 않음 |
+| `LLM_TIMEOUT_SECONDS` | Backend | LLM 호출 1회당 타임아웃(초), 기본 30 |
 | `LLM_MODE` | Backend | `real` / `mock`. ⚠️ mock 은 아직 구현되지 않음 (키가 없으면 `llm_error`) |
 | `ALLOWED_ORIGINS` | Backend | CORS 허용 도메인 (쉼표 구분, Vercel URL 포함) |
 | `MAX_FILES` | Backend | 기본 10 |
@@ -382,7 +398,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | 대상 | URL |
 |---|---|
 | Backend (Render) | https://seller-insight-api-31fd.onrender.com (`/health`, `/docs`) |
-| Frontend (Vercel) | 확정 후 기재 |
+| Frontend (Vercel) | https://ai-seller-insight.vercel.app |
 
 **Render 설정 (실제 적용값)**
 - Region: Singapore, Instance: Free

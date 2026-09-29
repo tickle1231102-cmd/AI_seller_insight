@@ -1,4 +1,4 @@
-export type Platform = "coupang" | "naver";
+export type Platform = "coupang" | "naver" | "naver_store";
 
 export interface ApiError {
   error: { code: string; message: string; details?: Record<string, unknown> };

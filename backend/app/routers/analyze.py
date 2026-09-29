@@ -68,11 +68,16 @@ def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | 
 
 def _analyze(uploads: list[UploadedFile], question: str | None) -> AnalyzeResponse:
     df = normalize.normalize_files([(u.filename, u.content) for u in uploads])  # 2·3
-    kpis = kpi.compute_kpis(df)  # 4
+    # 스마트스토어 판매 분석 행은 광고 리포트와 판매액이 겹칠 수 있어 kpis·comparison·신호·질문에서 뺀다.
+    # 스토어 파일만 올린 경우에는 비어 있으므로 전체 행으로 계산한다.
+    core = df[df["platform"] != normalize.STORE_PLATFORM]
+    if core.empty:
+        core = df
+    kpis = kpi.compute_kpis(core)  # 4
     store = kpi.compute_store_kpis(df)  # 4-1 스마트스토어 판매 분석 (없으면 None)
-    comparison = compare.build_comparison(df)  # 5
+    comparison = compare.build_comparison(core)  # 5
     sigs = signals.detect_signals(kpis, comparison)  # 6
-    insight = _run_ai(df, kpis, comparison, sigs, question)  # 7·8
+    insight = _run_ai(core, kpis, comparison, sigs, question)  # 7·8
     return AnalyzeResponse(  # 9
         kpis=kpis,
         comparison=comparison,

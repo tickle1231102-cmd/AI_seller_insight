@@ -5,6 +5,8 @@
 
 import pandas as pd
 
+from app.analysis.normalize import STORE_PLATFORM
+
 SUM_FIELDS = ["revenue", "orders", "units", "ad_spend", "ad_revenue"]
 
 
@@ -116,9 +118,7 @@ def compute_store_kpis(df: pd.DataFrame) -> dict | None:
     기간은 스마트스토어 데이터의 최신 월과 직전 월. products 는 최신 월 상품별 지표(총매출 내림차순, 최대 10개)이며
     각 상품의 전월 환불률·전환율 증감(%p)을 함께 준다.
     """
-    if "visits" not in df.columns:
-        return None
-    store = df[df["visits"].notna()]
+    store = df[df["platform"] == STORE_PLATFORM]
     if store.empty:
         return None
     store = store.astype({f: "int64" for f in STORE_SUM_FIELDS})

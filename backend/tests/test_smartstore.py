@@ -39,9 +39,9 @@ def test_sample_fixtures_exist():
     assert [p.name for p in SALES] == ["sales_20260801-20260831_sample.xlsx", "sales_20260901-20260930_sample.xlsx"]
 
 
-def test_sales_file_is_naver_with_period_from_date_column():
+def test_sales_file_is_naver_store_with_period_from_date_column():
     result = normalize.preview_file(SALES[1].name, SALES[1].read_bytes())
-    assert result["platform"] == "naver"
+    assert result["platform"] == "naver_store"
     assert result["periods"] == ["2026-09"]
     assert result["row_count"] == 10
     assert result["columns"][0] == "product_name" and "방문수" in result["columns"]
@@ -81,6 +81,12 @@ def test_dash_is_zero_and_daily_rows_are_merged():
     df = normalize.normalize_files([("sales.xlsx", xlsx(pd.DataFrame(rows)))])
     assert len(df) == 1
     assert (df.loc[0, "orders"], df.loc[0, "visits"], df.loc[0, "refund_count"]) == (20, 400, 2)
+
+
+def test_dash_is_invalid_number_outside_smartstore_sales():
+    with pytest.raises(AppError) as exc:
+        normalize.normalize_files([("coupang_2026-09.csv", "상품ID,상품명,총매출,주문,판매량,광고비,광고매출\nP1,a,-,1,1,0,0\n".encode())])
+    assert exc.value.code == "INVALID_NUMBER" and exc.value.details["value"] == "-"
 
 
 def test_missing_store_column_is_reported():
@@ -151,6 +157,25 @@ def test_api_analyze_returns_store(monkeypatch):
     assert body["store"]["period"] == "2026-09"
     coupang_row = next(r for r in body["rows"] if r["platform"] == "coupang")
     assert "visits" not in coupang_row and body["rows"][-1]["visits"] is not None
+
+
+def test_store_file_does_not_inflate_kpis_or_comparison(monkeypatch):
+    """스토어 파일과 광고 CSV 의 네이버 판매액이 겹쳐도 kpis·comparison 은 광고 리포트만으로 계산한다."""
+    monkeypatch.setattr("app.routers.analyze._load_ai", lambda: (_ for _ in ()).throw(RuntimeError("no ai")))
+    legacy = sorted(FIXTURES.glob("*_2026-0[89].csv"))
+    base = _post(legacy).json()
+    body = _post([*legacy, *SALES]).json()
+    assert body["kpis"] == base["kpis"] and body["comparison"] == base["comparison"]
+    assert body["signals"] == base["signals"]
+    assert {r["platform"] for r in body["rows"]} == {"coupang", "naver", "naver_store"}
+    assert body["store"]["period"] == "2026-09"
+
+
+def test_store_only_upload_still_analyzes(monkeypatch):
+    monkeypatch.setattr("app.routers.analyze._load_ai", lambda: (_ for _ in ()).throw(RuntimeError("no ai")))
+    res = _post(SALES)
+    assert res.status_code == 200, res.text
+    assert res.json()["comparison"]["by_platform"][0]["platform"] == "naver_store"
 
 
 def test_api_analyze_store_null_for_legacy(monkeypatch):
