@@ -55,7 +55,8 @@ def run_plan(df, plan) -> list[dict]:
         if period not in available:
             raise AppError(
                 "PERIOD_NOT_FOUND",
-                f"{period} 데이터가 없습니다. 업로드된 기간: {', '.join(available)}",
+                f"{period} 데이터가 업로드한 파일에 없어요. 업로드된 기간은 {', '.join(available)}입니다. "
+                "이 기간 안에서 다시 질문해 주세요.",
                 422,
                 {"period": period, "available": available},
             )

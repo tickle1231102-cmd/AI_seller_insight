@@ -261,7 +261,9 @@ def test_run_plan_missing_period_raises_app_error_with_readable_message(df):
     with pytest.raises(AppError) as exc:
         compare.run_plan(df, plan(period="2026-07"))
     assert exc.value.code == "PERIOD_NOT_FOUND"
-    assert "2026-07" in exc.value.message and "2026-08" in exc.value.message and "2026-09" in exc.value.message
+    assert exc.value.message == (
+        "2026-07 데이터가 업로드한 파일에 없어요. 업로드된 기간은 2026-08, 2026-09입니다. 이 기간 안에서 다시 질문해 주세요."
+    )
 
 
 def test_run_plan_accepts_pydantic_like_object(df):
