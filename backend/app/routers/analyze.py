@@ -69,6 +69,7 @@ def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | 
 def _analyze(uploads: list[UploadedFile], question: str | None) -> AnalyzeResponse:
     df = normalize.normalize_files([(u.filename, u.content) for u in uploads])  # 2·3
     kpis = kpi.compute_kpis(df)  # 4
+    store = kpi.compute_store_kpis(df)  # 4-1 스마트스토어 판매 분석 (없으면 None)
     comparison = compare.build_comparison(df)  # 5
     sigs = signals.detect_signals(kpis, comparison)  # 6
     insight = _run_ai(df, kpis, comparison, sigs, question)  # 7·8
@@ -78,6 +79,7 @@ def _analyze(uploads: list[UploadedFile], question: str | None) -> AnalyzeRespon
         rows=df.to_dict(orient="records"),
         signals=sigs,
         insight=insight,
+        store=store,
     )
 
 

@@ -1,4 +1,5 @@
-import type { AnalyzeResponse, Insight, PreviewResponse, Platform } from "@/types/api";
+import type { AnalyzeResponse, Insight, PreviewResponse, Platform, StoreKpis } from "@/types/api";
+import mockStore from "./mockStore.json";
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -57,7 +58,14 @@ function mockInsight(question?: string): Insight {
   };
 }
 
+// 스마트스토어 판매 분석 파일(sales_*.xlsx)이 있으면 store 블록을 붙인다. 값은 shared/fixtures/smartstore 샘플의 백엔드 계산 결과.
 export async function mockAnalyze(files: File[], question?: string): Promise<AnalyzeResponse> {
+  const res = await mockBaseAnalyze(files, question);
+  const hasSales = files.some((f) => /^sales_/i.test(f.name));
+  return { ...res, store: hasSales ? (mockStore as StoreKpis) : null };
+}
+
+async function mockBaseAnalyze(files: File[], question?: string): Promise<AnalyzeResponse> {
   await delay(900);
   const periods = new Set(files.map((f) => guessPeriod(f.name)));
   if (periods.size === 1) return singlePeriod([...periods][0], question);

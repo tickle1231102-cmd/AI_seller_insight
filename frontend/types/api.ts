@@ -73,6 +73,75 @@ export interface NormalizedRow {
   units: number;
   ad_spend: number;
   ad_revenue: number;
+  // 스마트스토어 판매 분석 파일의 행에만 있다
+  gross_revenue?: number;
+  visits?: number;
+  refund_count?: number;
+  refund_amount?: number;
+  discount_amount?: number;
+}
+
+export interface StoreValues {
+  visits: number;
+  orders: number;
+  units: number;
+  gross_revenue: number;
+  revenue: number;
+  refund_count: number;
+  refund_amount: number;
+  discount_amount: number;
+  conversion_rate: number | null;
+  net_ratio: number | null;
+  refund_rate: number | null;
+  refund_amount_rate: number | null;
+  discount_rate: number | null;
+  aov: number | null;
+}
+
+export interface StoreChange {
+  visits_change: number | null;
+  orders_change: number | null;
+  gross_revenue_change: number | null;
+  revenue_change: number | null;
+  aov_change: number | null;
+  conversion_rate_change_pp: number | null;
+  net_ratio_change_pp: number | null;
+  refund_rate_change_pp: number | null;
+  refund_amount_rate_change_pp: number | null;
+  discount_rate_change_pp: number | null;
+}
+
+export interface StoreProduct {
+  product_id: string;
+  product_name: string;
+  visits: number;
+  orders: number;
+  gross_revenue: number;
+  revenue: number;
+  conversion_rate: number | null;
+  refund_rate: number | null;
+  discount_rate: number | null;
+  aov: number | null;
+  refund_rate_change_pp: number | null;
+  conversion_rate_change_pp: number | null;
+}
+
+export interface StoreTrendPoint {
+  period: string;
+  visits: number;
+  orders: number;
+  revenue: number;
+  conversion_rate: number | null;
+}
+
+export interface StoreKpis {
+  period: string;
+  previous_period: string | null;
+  current: StoreValues;
+  previous: StoreValues | null;
+  change: StoreChange;
+  products: StoreProduct[];
+  trend: StoreTrendPoint[];
 }
 
 export type SignalCode =
@@ -105,4 +174,5 @@ export interface AnalyzeResponse {
   rows: NormalizedRow[];
   signals: Signal[];
   insight: Insight;
+  store?: StoreKpis | null; // 스마트스토어 판매 분석 파일이 없으면 null
 }
