@@ -45,7 +45,15 @@ def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | 
                 logger.warning("planner failed: %s", plan_result.reason)
                 return Insight(status="llm_error")
             plan = plan_result.plan
-            answer = compare.run_plan(df, plan)  # C
+            try:
+                answer = compare.run_plan(df, plan)  # C
+            except AppError as exc:
+                # 계획은 맞지만 데이터로 답할 수 없는 경우 (예: 없는 월). KPI 는 유지하고 이유를 안내한다.
+                return Insight(status="unsupported_question", plan=_dump(plan), summary=exc.message)
+            except Exception:
+                # C 계산 버그가 LLM 오류와 섞이지 않도록 로그를 구분해 남긴다.
+                logger.exception("run_plan failed (analysis bug, not LLM)")
+                return Insight(status="llm_error")
 
         result = ai.create_insight(kpis, comparison, sigs, plan=plan, answer=answer)  # D
         insight = Insight.model_validate(_dump(result))

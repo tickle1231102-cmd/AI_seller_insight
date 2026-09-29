@@ -40,6 +40,7 @@
 
 > `period` 는 원본 컬럼이 아니라 **파일명**에서 뽑는다 (예: `coupang_2026-09.csv` → `2026-09`). 규칙은 `\d{4}-(0[1-9]|1[0-2])` 이고, 없으면 `INVALID_PERIOD` 오류.
 > 플랫폼은 파일명이 아니라 **컬럼 구조**로 판별한다 (지표 컬럼 5개 중 3개 이상 일치하는 쪽, 동률·미달이면 `UNKNOWN_PLATFORM`).
+> 금액 필드(`revenue`, `ad_spend`, `ad_revenue`)는 정규화 단계에서 반올림해 정수(원)로 맞춘다.
 > `preview_file` 의 `columns` 는 맨 앞이 `product_name` 이고 그 뒤가 원본 지표 컬럼명이다. 프론트 미리보기 표가 `columns` 를 행의 키로 쓰기 때문이다.
 
 ## 2. 오류 응답
@@ -59,6 +60,7 @@
 | `INVALID_NUMBER` | 422 | `file`, `row`, `column`, `value` (`row` 는 헤더를 뺀 데이터 행 기준 1부터) |
 | `INVALID_PERIOD` | 422 | `file` (파일명에서 `_YYYY-MM` 을 찾지 못함) |
 | `UNKNOWN_PLATFORM` | 422 | `file` |
+| `INVALID_PERIOD` | 422 | `file` (파일명에서 `_YYYY-MM` 기간을 찾지 못함) |
 | `QUESTION_TOO_LONG` | 400 | `max_length` |
 | `NOT_FOUND` | 404 | — (없는 주소) |
 | `METHOD_NOT_ALLOWED` | 405 | — (잘못된 요청 방식) |
@@ -83,7 +85,11 @@ B 의 `routers/preview.py`, `routers/analyze.py` 가 아래 함수를 호출한�
 | 7 계획 실행 | `compare.run_plan(df, plan: AnalysisPlan) -> list[dict]` | `analysis/compare.py` (C) | 구현됨 |
 | 8 인사이트 | `create_insight(kpis, comparison, signals, *, plan=None, answer=None) -> Insight` | `ai/insight.py` (D) | D 브랜치 `feat/ai-planner-openai` |
 
-- 응답 `rows` 는 B 가 정규화 DataFrame 을 `df.to_dict(orient="records")` 로 변환한다.
+- 응답 `rows` 는 B 가 정규화 DataFrame 을 `df.to_dict(orient="records")` 로 변환한다. C 는 NaN 없이 Python 기본 타입으로 채운다.
+- `comparison.by_platform` 은 **최신 월 기준**이다. `trend` 는 전체 기간.
+- 그룹별 ROAS 는 행별 평균이 아니라 Σ광고매출 ÷ Σ광고비 × 100 으로 다시 계산한다.
+- `run_plan(df, plan)` 의 `plan` 은 D 의 `AnalysisPlan` 객체다. `sort=None` → desc, `period=None` → 최신 월, `group_by=None` → 전체 1행.
+- `run_plan` 이 `AppError` 를 던지면 (예: 데이터에 없는 월) `insight.status = "unsupported_question"`, `summary` 에 그 메시지를 담는다. 그 외 예외는 `llm_error` 로 표시하되 서버 로그에 `run_plan failed` 로 구분해 남긴다.
 - AI 단계(7·8)에서 어떤 예외가 나도 B 가 잡아 `insight.status = "llm_error"` 로 바꾸고 `kpis`/`comparison`/`rows`/`signals` 는 정상 반환한다.
 - `PlannerResult.status == "unsupported_question"` 이면 인사이트를 호출하지 않고 `insight.summary` 에 `reason` 을 담는다.
 
