@@ -81,20 +81,22 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 │  │  ├─ main.py                  ← B
 │  │  ├─ schemas.py               ← B
 │  │  ├─ routers/                 ← B  (health.py, preview.py, analyze.py)
-│  │  ├─ core/                    ← B  (config.py, errors.py)
+│  │  ├─ core/                    ← B  (config.py, errors.py, uploads.py)
 │  │  ├─ analysis/                ← C
 │  │  │  ├─ normalize.py
 │  │  │  ├─ kpi.py
 │  │  │  ├─ compare.py
 │  │  │  └─ signals.py
 │  │  └─ ai/                      ← D
+│  │     ├─ client.py             # OpenAI 호출 · 타임아웃 · 재시도
+│  │     ├─ models.py             # AnalysisPlan, PlannerResult, Insight
 │  │     ├─ planner.py
 │  │     ├─ insight.py
 │  │     └─ prompts/
 │  ├─ tests/
-│  │  ├─ test_api.py              ← B
-│  │  ├─ test_analysis.py         ← C
-│  │  └─ test_ai.py               ← D
+│  │  ├─ test_api.py, test_analyze.py                ← B
+│  │  ├─ test_analysis.py, test_normalize.py         ← C
+│  │  └─ test_ai.py, test_insight.py, test_ai_live.py ← D
 │  └─ requirements.txt
 ├─ shared/
 │  ├─ contracts/                  ← 전원 합의 / B 관리
@@ -108,15 +110,15 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| `period` | string (`YYYY-MM`) | 기간 |
+| `period` | string (`YYYY-MM`) | 기간 (원본 컬럼이 아니라 **파일명**의 `_YYYY-MM` 에서 추출) |
 | `platform` | string (`coupang` \| `naver`) | 플랫폼 |
 | `product_id` | string | 상품 ID |
 | `product_name` | string | 상품명 |
-| `revenue` | number (원) | 매출 |
+| `revenue` | integer (원) | 매출 |
 | `orders` | integer | 주문 수 |
 | `units` | integer | 판매 수량 |
-| `ad_spend` | number (원) | 광고비 |
-| `ad_revenue` | number (원) | 광고 전환매출 |
+| `ad_spend` | integer (원) | 광고비 |
+| `ad_revenue` | integer (원) | 광고 전환매출 |
 
 ### 4-1. 플랫폼 컬럼 매핑
 
@@ -127,6 +129,9 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | `units` | 판매량 | 결제상품수량 |
 | `ad_spend` | 광고비 | 광고비용 |
 | `ad_revenue` | 광고매출 | 전환매출 |
+| `product_id` | 상품ID | 상품ID |
+| `product_name` | 상품명 | 상품명 |
+| `period` | 파일명 `_YYYY-MM` | 파일명 `_YYYY-MM` |
 
 매핑 테이블은 `analysis/normalize.py` 의 `PLATFORM_COLUMN_MAP` 상수로 관리하며, 새 플랫폼은 이 매핑 추가만으로 지원할 수 있도록 한다.
 
@@ -137,6 +142,8 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 - 필수 컬럼 누락 → `MISSING_COLUMNS` 오류 (누락 컬럼 목록 포함)
 - 데이터 행 0개 → `EMPTY_FILE` 오류
 - 빈 숫자 셀 → 0 으로 처리
+- 금액 필드는 반올림해 정수(원)로 저장
+- 파일명에서 `_YYYY-MM` 을 찾지 못함 → `INVALID_PERIOD` 오류
 
 ## 5. KPI 계산 명세
 
@@ -202,8 +209,16 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | `MISSING_COLUMNS` | 422 | 필수 컬럼 누락 |
 | `INVALID_NUMBER` | 422 | 숫자 변환 실패 |
 | `UNKNOWN_PLATFORM` | 422 | 플랫폼 판별 불가 |
+| `INVALID_PERIOD` | 422 | 파일명에서 `_YYYY-MM` 기간을 찾지 못함 |
 | `QUESTION_TOO_LONG` | 400 | 질문 길이 초과 |
-| `INTERNAL_ERROR` | 500 | 기타 서버 오류 |
+| `NOT_FOUND` | 404 | 없는 주소 |
+| `METHOD_NOT_ALLOWED` | 405 | 잘못된 요청 방식 |
+| `INVALID_REQUEST` | 422 | 요청 형식 오류 (`details.errors: [{field, message}]`) |
+| `HTTP_ERROR` | 원래 상태 코드 | 위에 없는 그 밖의 프레임워크 HTTP 오류 |
+| `INTERNAL_ERROR` | 500 | 기타 서버 오류 (스택트레이스는 응답에 노출하지 않고 서버 로그에만 기록) |
+
+- 모든 오류는 위 `{"error":{code,message,details}}` 형식이며, 500 을 포함한 모든 오류 응답에 CORS 헤더가 붙는다.
+- 오류별 `details` 키는 [`shared/contracts/README.md`](../shared/contracts/README.md) 2장 참고.
 
 ### 7-2. `GET /health`
 
@@ -281,8 +296,11 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 |---|---|---|
 | `ok` | 정상 | 전체 표시 |
 | `unsupported_question` | 질문을 분석 계획으로 변환 불가 | 안내 문구 + 질문 예시 표시 |
-| `llm_error` | LLM 호출 실패/타임아웃/JSON 검증 실패 | KPI는 표시, AI 영역에 재시도 안내 |
-| `skipped` | 질문 없음 + 인사이트 미요청 | AI 영역 숨김 또는 기본 요약 |
+| `llm_error` | LLM 호출 실패/타임아웃/JSON 검증 실패, API 키 없음, 계획 실행(`run_plan`) 중 예상 못 한 오류 | KPI는 표시, AI 영역에 재시도 안내 |
+| `skipped` | 예약된 값. 현재 백엔드는 보내지 않음 (질문이 없어도 인사이트를 생성) | AI 영역 숨김 |
+
+- 질문이 없으면 계획(`plan`)·답(`answer`) 없이 KPI 요약 인사이트를 만든다.
+- `unsupported_question` 이면 `summary` 에 사용자에게 보여 줄 이유가 담긴다 (예: 데이터에 없는 월을 물으면 업로드된 기간 안내).
 
 ## 8. AI 모듈 명세 (D)
 
@@ -339,12 +357,16 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 
 | 변수 | 위치 | 설명 |
 |---|---|---|
-| `LLM_API_KEY` | Backend | LLM API 키 (절대 커밋 금지) |
+| `LLM_API_KEY` | Backend | LLM API 키 (절대 커밋 금지). 현재 `ai/client.py` 는 `OPENAI_API_KEY` 도 읽음 — 하나로 통일 예정 |
 | `LLM_MODEL` | Backend | 사용할 모델명 |
+| `LLM_TIMEOUT_SECONDS` | Backend | LLM 호출 타임아웃, 기본 15. ⚠️ 현재 `ai/client.py` 는 15초 고정이라 이 값이 반영되지 않음 |
+| `LLM_MODE` | Backend | `real` / `mock`. ⚠️ mock 은 아직 구현되지 않음 (키가 없으면 `llm_error`) |
 | `ALLOWED_ORIGINS` | Backend | CORS 허용 도메인 (쉼표 구분, Vercel URL 포함) |
 | `MAX_FILES` | Backend | 기본 10 |
 | `MAX_FILE_SIZE_MB` | Backend | 기본 5 |
 | `NEXT_PUBLIC_API_BASE_URL` | Frontend | Backend URL |
+| `NEXT_PUBLIC_USE_MOCK` | Frontend | `true` 면 Backend 대신 mock 데이터 사용 |
+| `PYTHON_VERSION` | Render | 백엔드 Python 버전 고정 (`3.12.10`) |
 
 각 앱에 `.env.example` 을 커밋하고 실제 `.env` 는 `.gitignore` 에 포함한다.
 
@@ -355,7 +377,20 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | Frontend | Vercel | Root: `frontend/`, env: `NEXT_PUBLIC_API_BASE_URL` |
 | Backend | Render (Web Service) | Root: `backend/`, Build: `pip install -r requirements.txt`, Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
 
-- Render 무료 플랜 콜드 스타트 대비: 시연 전 `/health` 호출로 워밍업
+**배포 주소**
+
+| 대상 | URL |
+|---|---|
+| Backend (Render) | https://seller-insight-api-31fd.onrender.com (`/health`, `/docs`) |
+| Frontend (Vercel) | 확정 후 기재 |
+
+**Render 설정 (실제 적용값)**
+- Region: Singapore, Instance: Free
+- Health Check Path: `/health`
+- 환경변수: `PYTHON_VERSION=3.12.10`, `ALLOWED_ORIGINS`, `LLM_MODE` (API 키는 Render 대시보드에서만 입력)
+- 저장소를 Public Git Repository 로 연결해 `main` 머지 후 자동 배포가 되지 않을 수 있음 → Render 에서 **Manual Deploy → Deploy latest commit**
+
+- Render 무료 플랜 콜드 스타트 대비: 시연 전 `/health` 호출로 워밍업 (첫 요청 최대 50초 이상 지연 가능)
 
 ## 12. 테스트 전략
 

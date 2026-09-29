@@ -4,6 +4,16 @@
 
 ---
 
+## 배포
+
+| 대상 | URL |
+|---|---|
+| Frontend (Vercel) | 확정 후 기재 |
+| Backend API (Render) | https://seller-insight-api-31fd.onrender.com |
+| API 문서 (Swagger) | https://seller-insight-api-31fd.onrender.com/docs |
+
+> Render 무료 플랜은 한동안 요청이 없으면 잠듭니다. 첫 요청이 50초 이상 걸릴 수 있으니 시연 전에 [`/health`](https://seller-insight-api-31fd.onrender.com/health) 를 한 번 열어 깨워 두세요.
+
 ## 무엇을 해결하나요?
 
 온라인 셀러는 쿠팡, 네이버 등 여러 플랫폼에서 판매·광고 데이터를 따로 내려받아 엑셀로 직접 합치고 계산합니다.
