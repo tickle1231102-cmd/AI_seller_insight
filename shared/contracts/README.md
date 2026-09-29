@@ -34,11 +34,12 @@
 | `units` | 판매량 | 결제상품수량 |
 | `ad_spend` | 광고비 | 광고비용 |
 | `ad_revenue` | 광고매출 | 전환매출 |
-| `period` | **미정** | **미정** |
-| `product_id` | **미정** | **미정** |
-| `product_name` | **미정** | **미정** |
+| `product_id` | 상품ID | 상품ID |
+| `product_name` | 상품명 | 상품명 |
+| `period` | 파일명의 `_YYYY-MM` | 파일명의 `_YYYY-MM` |
 
-> ⚠️ `period` / `product_id` / `product_name` 의 원본 컬럼(또는 파일명 규칙)은 TECH_SPEC 에 없다. C 가 fixture 제작 시 확정해 이 표에 채운다.
+> `period` 는 원본에 컬럼이 없어 파일명에서 추출한다 (예: `coupang_2026-09.csv` → `2026-09`). 추출하지 못하면 `INVALID_PERIOD`.
+> 금액 필드(`revenue`, `ad_spend`, `ad_revenue`)는 정규화 단계에서 반올림해 정수(원)로 맞춘다.
 
 ## 2. 오류 응답
 
@@ -56,6 +57,7 @@
 | `MISSING_COLUMNS` | 422 | `file`, `missing` |
 | `INVALID_NUMBER` | 422 | `file`, `row`, `column` |
 | `UNKNOWN_PLATFORM` | 422 | `file` |
+| `INVALID_PERIOD` | 422 | `file` (파일명에서 `_YYYY-MM` 기간을 찾지 못함) |
 | `QUESTION_TOO_LONG` | 400 | `max_length` |
 | `NOT_FOUND` | 404 | — (없는 주소) |
 | `METHOD_NOT_ALLOWED` | 405 | — (잘못된 요청 방식) |
