@@ -58,13 +58,13 @@
 | `EMPTY_FILE` | 422 | `file` |
 | `MISSING_COLUMNS` | 422 | `file`, `missing` |
 | `INVALID_NUMBER` | 422 | `file`, `row`, `column`, `value` (`row` 는 헤더를 뺀 데이터 행 기준 1부터) |
-| `INVALID_PERIOD` | 422 | `file` (파일명에서 `_YYYY-MM` 을 찾지 못함) |
 | `UNKNOWN_PLATFORM` | 422 | `file` |
 | `INVALID_PERIOD` | 422 | `file` (파일명에서 `_YYYY-MM` 기간을 찾지 못함) |
 | `QUESTION_TOO_LONG` | 400 | `max_length` |
 | `NOT_FOUND` | 404 | — (없는 주소) |
 | `METHOD_NOT_ALLOWED` | 405 | — (잘못된 요청 방식) |
 | `INVALID_REQUEST` | 422 | `errors`: `[{field, message}]` (요청 형식 오류) |
+| `HTTP_ERROR` | 원래 상태 코드 | — (위에 없는 그 밖의 프레임워크 HTTP 오류. 프론트는 서버 메시지를 그대로 보여준다) |
 | `INTERNAL_ERROR` | 500 | — |
 
 `details` 키 이름은 `frontend/lib/api/client.ts` 의 오류 메시지 함수가 사용한다 (`file`, `missing`, `row`, `column`).
@@ -81,14 +81,14 @@ B 의 `routers/preview.py`, `routers/analyze.py` 가 아래 함수를 호출한�
 | 4 KPI | `kpi.compute_kpis(df) -> dict` (응답 `kpis`) | `analysis/kpi.py` (C) | 구현됨 |
 | 5 비교 | `compare.build_comparison(df) -> dict` (응답 `comparison`) | `analysis/compare.py` (C) | 구현됨 |
 | 6 신호 | `signals.detect_signals(kpis, comparison) -> list[dict]` | `analysis/signals.py` (C) | 구현됨 |
-| 7 질문 해석 | `create_analysis_plan(question: str) -> PlannerResult` | `ai/planner.py` (D) | D 브랜치 `feat/ai-planner-openai` |
+| 7 질문 해석 | `create_analysis_plan(question: str) -> PlannerResult` | `ai/planner.py` (D) | 구현됨 |
 | 7 계획 실행 | `compare.run_plan(df, plan: AnalysisPlan) -> list[dict]` | `analysis/compare.py` (C) | 구현됨 |
-| 8 인사이트 | `create_insight(kpis, comparison, signals, *, plan=None, answer=None) -> Insight` | `ai/insight.py` (D) | D 브랜치 `feat/ai-planner-openai` |
+| 8 인사이트 | `create_insight(kpis, comparison, signals, *, plan=None, answer=None) -> Insight` | `ai/insight.py` (D) | 구현됨 |
 
 - 응답 `rows` 는 B 가 정규화 DataFrame 을 `df.to_dict(orient="records")` 로 변환한다. C 는 NaN 없이 Python 기본 타입으로 채운다.
 - `comparison.by_platform` 은 **최신 월 기준**이다. `trend` 는 전체 기간.
 - 그룹별 ROAS 는 행별 평균이 아니라 Σ광고매출 ÷ Σ광고비 × 100 으로 다시 계산한다.
-- `run_plan(df, plan)` 의 `plan` 은 D 의 `AnalysisPlan` 객체다. `sort=None` → desc, `period=None` → 최신 월, `group_by=None` → 전체 1행.
+- `run_plan(df, plan)` 의 `plan` 은 D 의 `AnalysisPlan` 객체다. `sort=None` → desc, `period=None` → 최신 월 (단 `group_by="period"` 이면 전체 기간, 5장 참고), `group_by=None` → 전체 1행.
 - `run_plan` 이 `AppError` 를 던지면 (예: 데이터에 없는 월) `insight.status = "unsupported_question"`, `summary` 에 그 메시지를 담는다. 그 외 예외는 `llm_error` 로 표시하되 서버 로그에 `run_plan failed` 로 구분해 남긴다.
 - AI 단계(7·8)에서 어떤 예외가 나도 B 가 잡아 `insight.status = "llm_error"` 로 바꾸고 `kpis`/`comparison`/`rows`/`signals` 는 정상 반환한다.
 - `PlannerResult.status == "unsupported_question"` 이면 인사이트를 호출하지 않고 `insight.summary` 에 `reason` 을 담는다.
