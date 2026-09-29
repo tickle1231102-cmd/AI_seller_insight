@@ -8,7 +8,7 @@
 
 | 대상 | URL |
 |---|---|
-| Frontend (Vercel) | 확정 후 기재 |
+| Frontend (Vercel) | https://ai-seller-insight.vercel.app |
 | Backend API (Render) | https://seller-insight-api-31fd.onrender.com |
 | API 문서 (Swagger) | https://seller-insight-api-31fd.onrender.com/docs |
 
