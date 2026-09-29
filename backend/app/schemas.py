@@ -9,6 +9,9 @@ from pydantic import BaseModel, ConfigDict
 
 Platform = Literal["coupang", "naver"]
 
+# 금액(원)은 정수. KRW 는 소수점이 없고 12600000.0 처럼 직렬화되지 않게 한다.
+Won = int
+
 
 # ---- /api/preview ----
 class PreviewFile(BaseModel):
@@ -26,11 +29,11 @@ class PreviewResponse(BaseModel):
 
 # ---- /api/analyze ----
 class KPIValues(BaseModel):
-    revenue: float
+    revenue: Won
     orders: int
     units: int
-    ad_spend: float
-    ad_revenue: float
+    ad_spend: Won
+    ad_revenue: Won
     roas: float | None
 
 
@@ -53,16 +56,16 @@ class KPIs(BaseModel):
 
 class PlatformComparison(BaseModel):
     platform: Platform
-    revenue: float
+    revenue: Won
     orders: int
-    ad_spend: float
-    ad_revenue: float
+    ad_spend: Won
+    ad_revenue: Won
     roas: float | None
 
 
 class TrendPoint(BaseModel):
     period: str
-    revenue: float
+    revenue: Won
     roas: float | None
 
 
@@ -76,11 +79,11 @@ class Row(BaseModel):
     platform: Platform
     product_id: str
     product_name: str
-    revenue: float
+    revenue: Won
     orders: int
     units: int
-    ad_spend: float
-    ad_revenue: float
+    ad_spend: Won
+    ad_revenue: Won
 
 
 class Signal(BaseModel):
@@ -96,7 +99,7 @@ class Insight(BaseModel):
     status: Literal["ok", "unsupported_question", "llm_error", "skipped"]
     plan: dict[str, Any] | None = None
     answer: list[dict[str, Any]] | None = None
-    summary: str | None = None
+    summary: str = ""  # TS 타입(summary?: string)이 null 을 허용하지 않아 빈 문자열로 둔다
     evidence: list[str] = []
     checks: list[str] = []
     actions: list[str] = []

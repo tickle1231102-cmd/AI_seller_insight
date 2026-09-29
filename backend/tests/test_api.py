@@ -99,3 +99,28 @@ def test_unexpected_error_hides_stacktrace(monkeypatch):
     monkeypatch.setattr(normalize, "preview_file", boom)
     err = assert_error(client.post("/api/preview", files=[csv_file()]), 500, "INTERNAL_ERROR")
     assert "secret" not in json.dumps(err)
+
+
+# ---- FastAPI 기본 오류도 공통 형식 (리뷰 반영, WU-BE-05) ----
+def test_not_found_uses_error_format():
+    assert_error(client.get("/no-such-path"), 404, "NOT_FOUND")
+
+
+def test_method_not_allowed_uses_error_format():
+    assert_error(client.get("/api/preview"), 405, "METHOD_NOT_ALLOWED")
+
+
+def test_invalid_request_uses_error_format():
+    # files 에 파일이 아닌 문자열을 보내면 요청 형식 오류
+    err = assert_error(client.post("/api/preview", data={"files": "not-a-file"}), 422, "INVALID_REQUEST")
+    assert err["details"]["errors"]
+
+
+# ---- 직렬화 형식 (리뷰 반영) ----
+def test_money_serialized_as_int_and_summary_not_null():
+    data = json.loads((CONTRACTS / "analyze_response.json").read_text(encoding="utf-8"))
+    data["insight"].pop("summary")
+    out = json.loads(AnalyzeResponse.model_validate(data).model_dump_json())
+    assert out["kpis"]["current"]["revenue"] == 12600000
+    assert isinstance(out["kpis"]["current"]["revenue"], int)
+    assert out["insight"]["summary"] == ""

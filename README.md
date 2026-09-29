@@ -89,6 +89,8 @@ AI는 CTR·CPC·광고 소재·경쟁사 가격처럼 **업로드 데이터에 �
 
 ### Backend
 
+Mac / Linux
+
 ```bash
 cd backend
 python -m venv .venv && source .venv/bin/activate
@@ -97,14 +99,33 @@ cp .env.example .env   # LLM_API_KEY 등 설정
 uvicorn app.main:app --reload --port 8000
 ```
 
-`http://localhost:8000/health` 에서 `{"status":"ok"}` 확인
+Windows (PowerShell)
+
+```powershell
+cd backend
+python -m venv .venv; .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+copy .env.example .env   # LLM_API_KEY 등 설정
+uvicorn app.main:app --reload --port 8000
+```
+
+- `http://localhost:8000/health` 에서 `{"status":"ok"}` 확인
+- `http://localhost:8000/docs` 에서 API 직접 테스트 (Swagger)
+
+테스트
+
+```bash
+cd backend
+pytest -q
+```
 
 ### Frontend
 
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local   # NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+cp .env.example .env.local   # Windows: copy .env.example .env.local
+                             # NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 npm run dev
 ```
 
