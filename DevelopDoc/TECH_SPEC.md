@@ -110,7 +110,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| `period` | string (`YYYY-MM`) | 기간 (원본 컬럼이 아니라 **파일명**의 `_YYYY-MM` 에서 추출) |
+| `period` | string (`YYYY-MM`) | 기간 (원본 컬럼이 아니라 **파일명**의 `YYYY-MM` 에서 추출. 앞뒤에 숫자가 붙지 않은 것, 예: `coupang_2026-09.csv`) |
 | `platform` | string (`coupang` \| `naver`) | 플랫폼 |
 | `product_id` | string | 상품 ID |
 | `product_name` | string | 상품명 |
@@ -131,7 +131,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | `ad_revenue` | 광고매출 | 전환매출 |
 | `product_id` | 상품ID | 상품ID |
 | `product_name` | 상품명 | 상품명 |
-| `period` | 파일명 `_YYYY-MM` | 파일명 `_YYYY-MM` |
+| `period` | 파일명의 `YYYY-MM` | 파일명의 `YYYY-MM` |
 
 매핑 테이블은 `analysis/normalize.py` 의 `PLATFORM_COLUMN_MAP` 상수로 관리하며, 새 플랫폼은 이 매핑 추가만으로 지원할 수 있도록 한다.
 
@@ -142,8 +142,8 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 - 필수 컬럼 누락 → `MISSING_COLUMNS` 오류 (누락 컬럼 목록 포함)
 - 데이터 행 0개 → `EMPTY_FILE` 오류
 - 빈 숫자 셀 → 0 으로 처리
-- 금액 필드는 반올림해 정수(원)로 저장
-- 파일명에서 `_YYYY-MM` 을 찾지 못함 → `INVALID_PERIOD` 오류
+- 금액·수량 5개 필드(`revenue`, `orders`, `units`, `ad_spend`, `ad_revenue`)는 정수로 반올림 (Python `round` 라 `.5` 는 짝수 쪽으로)
+- 파일명에서 `YYYY-MM` 을 찾지 못함 → `INVALID_PERIOD` 오류
 
 ## 5. KPI 계산 명세
 
@@ -209,7 +209,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | `MISSING_COLUMNS` | 422 | 필수 컬럼 누락 |
 | `INVALID_NUMBER` | 422 | 숫자 변환 실패 |
 | `UNKNOWN_PLATFORM` | 422 | 플랫폼 판별 불가 |
-| `INVALID_PERIOD` | 422 | 파일명에서 `_YYYY-MM` 기간을 찾지 못함 |
+| `INVALID_PERIOD` | 422 | 파일명에서 `YYYY-MM` 기간을 찾지 못함 |
 | `QUESTION_TOO_LONG` | 400 | 질문 길이 초과 |
 | `NOT_FOUND` | 404 | 없는 주소 |
 | `METHOD_NOT_ALLOWED` | 405 | 잘못된 요청 방식 |
@@ -239,14 +239,14 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
       "platform": "coupang",
       "periods": ["2026-09"],
       "row_count": 42,
-      "columns": ["총매출", "주문", "판매량", "광고비", "광고매출"],
+      "columns": ["product_name", "총매출", "주문", "판매량", "광고비", "광고매출"],
       "preview": [ { "product_name": "...", "총매출": 120000 } ]
     }
   ]
 }
 ```
 
-`preview` 는 파일당 최대 10행.
+`preview` 는 파일당 최대 10행. `columns` 는 맨 앞이 `product_name` 이고 그 뒤가 원본 지표 컬럼명이다 (프론트 미리보기 표가 `columns` 를 행의 키로 쓴다).
 
 ### 7-4. `POST /api/analyze`
 
