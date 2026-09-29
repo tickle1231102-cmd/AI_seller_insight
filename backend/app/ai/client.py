@@ -26,14 +26,18 @@ class OpenAIStructuredClient:
         *,
         api_key: str | None = None,
         model: str | None = None,
-        timeout_seconds: float = 15.0,
+        timeout_seconds: float | None = None,
         client: object | None = None,
     ) -> None:
         # OPENAI_API_KEY is the preferred name. LLM_API_KEY keeps compatibility
         # with the current TECH_SPEC while B finalizes shared environment names.
         self.api_key = api_key or os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
         self.model = model or os.getenv("LLM_MODEL") or "gpt-6-luna"
-        self.timeout_seconds = timeout_seconds
+        self.timeout_seconds = (
+            timeout_seconds
+            if timeout_seconds is not None
+            else float(os.getenv("LLM_TIMEOUT_SECONDS") or 30)
+        )
         self._client = client
 
     def _get_client(self) -> object:

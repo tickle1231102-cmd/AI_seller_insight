@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from backend.app.ai.client import LLMClientError
 from backend.app.ai.insight import create_insight
-from backend.app.ai.models import AnalysisPlan, Insight, InsightContent
+from backend.app.ai.models import AnalysisPlan, Insight, InsightDraft
 from backend.app.ai.prompts import INSIGHT_INSTRUCTIONS
 
 
@@ -62,7 +62,7 @@ def test_insight_contract_and_evidence_postprocessing():
     assert result.answer == answer
     assert result.evidence == ["광고비 +28.0%", "광고매출 +22.4%", "ROAS -14.2%p"]
     assert llm.kwargs is not None
-    assert llm.kwargs["schema"] is InsightContent
+    assert llm.kwargs["schema"] is InsightDraft
     assert '"ad_spend_change": 28.0' in llm.kwargs["input_text"]
 
 

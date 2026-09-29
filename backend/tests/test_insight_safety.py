@@ -13,7 +13,7 @@ from app.main import app
 from app.routers import analyze as analyze_router
 from backend.app.ai.client import LLMClientError
 from backend.app.ai.insight import create_insight
-from backend.app.ai.models import AnalysisPlan, Insight, InsightContent, PlannerResult
+from backend.app.ai.models import AnalysisPlan, Insight, InsightContent, InsightDraft, PlannerResult
 
 
 class FakeLLM:
@@ -54,6 +54,16 @@ def test_generation_schema_contains_only_explanation_fields():
     assert run(llm).status == "ok"
     assert llm.schema is InsightContent
     assert set(InsightContent.model_json_schema()["properties"]) == {
+        "summary", "evidence", "checks", "actions", "limitations"
+    }
+
+
+def test_main_draft_name_and_previous_content_name_share_one_text_only_schema():
+    assert InsightContent is InsightDraft
+    llm = FakeLLM(content())
+    assert run(llm).status == "ok"
+    assert llm.schema is InsightDraft
+    assert set(InsightDraft.model_fields) == {
         "summary", "evidence", "checks", "actions", "limitations"
     }
 

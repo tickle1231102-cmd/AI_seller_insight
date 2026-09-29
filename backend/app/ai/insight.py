@@ -7,7 +7,7 @@ from typing import Any, Protocol, TypeVar
 from pydantic import BaseModel, ValidationError
 
 from .client import LLMClientError, OpenAIStructuredClient
-from .models import AnalysisPlan, Insight, InsightContent
+from .models import AnalysisPlan, Insight, InsightDraft
 from .number_grounding import NumberGrounding
 from .prompts import INSIGHT_INSTRUCTIONS
 
@@ -52,7 +52,7 @@ def create_insight(
     generator = llm or OpenAIStructuredClient()
     try:
         generated = generator.generate_structured(
-            schema=InsightContent,
+            schema=InsightDraft,
             instructions=INSIGHT_INSTRUCTIONS,
             input_text=json.dumps(payload, ensure_ascii=False, default=str),
             max_output_tokens=800,
@@ -63,9 +63,9 @@ def create_insight(
     try:
         # Validate even an injected generator. Ignore any attempted metadata
         # injection rather than copying the provider's full response object.
-        fields = InsightContent.model_fields
+        fields = InsightDraft.model_fields
         raw = generated.model_dump() if isinstance(generated, BaseModel) else generated
-        content = InsightContent.model_validate(
+        content = InsightDraft.model_validate(
             {name: raw[name] for name in fields if name in raw}
             if isinstance(raw, Mapping)
             else raw

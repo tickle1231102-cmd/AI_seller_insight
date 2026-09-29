@@ -63,14 +63,21 @@ class PlannerResult(BaseModel):
         return self
 
 
-class InsightContent(BaseModel):
-    """Text-only LLM output; response metadata belongs to the caller."""
+class InsightDraft(BaseModel):
+    """Text-only LLM output, compatible with OpenAI's strict schema.
+
+    Keep main's Draft name, but status/reason/plan/answer remain server-owned.
+    """
 
     summary: str
     evidence: list[str]
     checks: list[str]
     actions: list[str]
     limitations: list[str]
+
+
+# Preserve the earlier PR #10 import name without a second, divergent schema.
+InsightContent = InsightDraft
 
 
 class Insight(BaseModel):

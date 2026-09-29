@@ -31,23 +31,52 @@ PLATFORM_COLUMN_MAP: dict[str, dict[str, str]] = {
 PRODUCT_ID_COLUMN = "상품ID"
 PRODUCT_NAME_COLUMN = "상품명"
 
+# 네이버 스마트스토어 통계 > 판매 분석(SALES) 내보내기. 광고 지표가 없어 ad_spend·ad_revenue 는 0 으로 둔다.
+SMARTSTORE_SALES_MAP: dict[str, str] = {
+    "revenue": "판매금액(순)",
+    "orders": "상품결제건수",
+    "units": "결제상품수량",
+    "gross_revenue": "판매금액(총)",
+    "visits": "방문수",
+    "refund_count": "환불건수",
+    "refund_amount": "환불금액",
+    "discount_amount": "전체 할인액",
+}
+SMARTSTORE_ID_COLUMN = "채널상품번호"
+SMARTSTORE_NAME_COLUMN = "채널상품명"
+SMARTSTORE_DATE_COLUMN = "날짜"
+SMARTSTORE_SALES_KEYS = {SMARTSTORE_ID_COLUMN, SMARTSTORE_NAME_COLUMN, "판매금액(총)"}
+# 스마트스토어 방문·검색·고객 분석 파일. 판별만 하고 분석은 아직 지원하지 않는다 (WORK_UNITS P1).
+SMARTSTORE_OTHER_KEYS = {"visit": {"경로(1단계)", "방문수"}, "query": {"검색어", "방문수"}, "customer": {"고객분류", "방문고객수"}}
+
 NORMALIZED_COLUMNS = ["period", "platform", "product_id", "product_name", "revenue", "orders", "units", "ad_spend", "ad_revenue"]
+# 스마트스토어 판매 분석 파일에만 있는 지표. 다른 파일의 행은 None.
+STORE_FIELDS = ["gross_revenue", "visits", "refund_count", "refund_amount", "discount_amount"]
 
 MIN_PLATFORM_MATCH = 3  # 플랫폼 지표 컬럼 5개 중 이 개수 이상 맞아야 그 플랫폼으로 본다
 PREVIEW_ROWS = 10
 
 _PERIOD_RE = re.compile(r"(?<!\d)(\d{4})-(0[1-9]|1[0-2])(?!\d)")
+_DATE_RE = re.compile(r"(?<!\d)(\d{4})[-.]?(0[1-9]|1[0-2])[-.]?(0[1-9]|[12]\d|3[01])(?!\d)")
 _NUMBER_RE = re.compile(r"[+-]?(\d+(\.\d*)?|\.\d+)")
 
 
 @dataclass
 class _Parsed:
     platform: str
-    period: str
-    metric_columns: list[str]  # 원본 지표 컬럼명 (revenue, orders, units, ad_spend, ad_revenue 순)
+    periods: list[str]  # 행마다의 기간 (YYYY-MM)
+    field_map: dict[str, str]  # 공통 필드 → 원본 지표 컬럼명
     product_ids: list[str]
     product_names: list[str]
     metrics: dict[str, list[int | float]]  # 원본 컬럼명 → 숫자로 바꾼 값
+
+    @property
+    def metric_columns(self) -> list[str]:
+        return list(self.field_map.values())
+
+    @property
+    def is_smartstore(self) -> bool:
+        return self.field_map is SMARTSTORE_SALES_MAP
 
 
 def _decode(content: bytes) -> str:
@@ -91,23 +120,38 @@ def _detect_platform(filename: str, columns: list[str]) -> str:
     return winners[0]
 
 
+def _midpoint_month(text: str) -> str | None:
+    """문자열 속 날짜(YYYYMMDD, YYYY-MM-DD)들의 첫·끝 날짜 중간이 속한 월. 날짜가 없으면 None.
+
+    스마트스토어 내보내기는 20260830-20260928 처럼 월 경계를 걸치므로 기간의 대부분이 속한 월로 본다.
+    """
+    dates = [pd.Timestamp(int(y), int(m), int(d)) for y, m, d in _DATE_RE.findall(text)]
+    if not dates:
+        return None
+    mid = dates[0] + (dates[-1] - dates[0]) / 2
+    return f"{mid.year:04d}-{mid.month:02d}"
+
+
 def _extract_period(filename: str) -> str:
-    """파일명의 _YYYY-MM 에서 기간을 뽑는다 (예: coupang_2026-09.csv → 2026-09)."""
+    """파일명에서 기간을 뽑는다. _YYYY-MM (coupang_2026-09.csv) 또는 날짜 범위 (sales_20260901-20260930.xlsx)."""
     match = _PERIOD_RE.search(filename)
-    if not match:
+    if match:
+        return match.group(0)
+    period = _midpoint_month(filename)
+    if period is None:
         raise AppError(
             "INVALID_PERIOD",
             f"{filename}: 파일명에서 기간(YYYY-MM)을 찾을 수 없습니다. 예: coupang_2026-09.csv",
             422,
             {"file": filename},
         )
-    return match.group(0)
+    return period
 
 
 def _to_number(raw: str) -> int | float:
     """TECH_SPEC 4-2: ',' '원' 공백 제거 후 숫자 변환. 빈 셀은 0. 변환 불가면 ValueError."""
     text = raw.replace(",", "").replace("원", "").replace(" ", "")
-    if text == "":
+    if text in ("", "-"):  # 스마트스토어 내보내기는 값이 없으면 '-' 로 적는다
         return 0
     if not _NUMBER_RE.fullmatch(text):  # float() 가 받아주는 nan, inf, 1e5, 1_000 은 숫자로 보지 않는다
         raise ValueError(raw)
@@ -115,13 +159,31 @@ def _to_number(raw: str) -> int | float:
     return int(value) if value.is_integer() else value
 
 
+def _reject_other_smartstore(filename: str, columns: list[str]) -> None:
+    for kind, keys in SMARTSTORE_OTHER_KEYS.items():
+        if keys <= set(columns):
+            raise AppError(
+                "UNSUPPORTED_DATASET",
+                f"{filename}: 스마트스토어 {kind} 분석 파일은 아직 지원하지 않습니다. 판매 분석(SALES) 파일을 올려주세요.",
+                422,
+                {"file": filename, "dataset": kind},
+            )
+
+
 def _parse(filename: str, content: bytes) -> _Parsed:
     df = _read_table(filename, content)
     columns = list(df.columns)
-    platform = _detect_platform(filename, columns)
-    metric_columns = list(PLATFORM_COLUMN_MAP[platform].values())
+    if SMARTSTORE_SALES_KEYS <= set(columns):
+        platform, field_map = "naver", SMARTSTORE_SALES_MAP
+        id_column, name_column = SMARTSTORE_ID_COLUMN, SMARTSTORE_NAME_COLUMN
+    else:
+        _reject_other_smartstore(filename, columns)
+        platform = _detect_platform(filename, columns)
+        field_map = PLATFORM_COLUMN_MAP[platform]
+        id_column, name_column = PRODUCT_ID_COLUMN, PRODUCT_NAME_COLUMN
+    metric_columns = list(field_map.values())
 
-    missing = [c for c in (PRODUCT_ID_COLUMN, PRODUCT_NAME_COLUMN, *metric_columns) if c not in columns]
+    missing = [c for c in (id_column, name_column, *metric_columns) if c not in columns]
     if missing:
         raise AppError(
             "MISSING_COLUMNS",
@@ -130,7 +192,13 @@ def _parse(filename: str, content: bytes) -> _Parsed:
             {"file": filename, "missing": missing},
         )
 
-    period = _extract_period(filename)
+    if field_map is SMARTSTORE_SALES_MAP and SMARTSTORE_DATE_COLUMN in columns:
+        # 행의 '날짜' (예: 2026-09-01~2026-09-30) 가 우선, 없으면 파일명 기간
+        row_periods = [_midpoint_month(v) for v in df[SMARTSTORE_DATE_COLUMN]]
+        fallback = None if all(row_periods) else _extract_period(filename)
+        periods = [p or fallback for p in row_periods]
+    else:
+        periods = [_extract_period(filename)] * len(df)
 
     metrics: dict[str, list[int | float]] = {c: [] for c in metric_columns}
     for row_no, record in enumerate(df[metric_columns].to_dict("records"), start=1):  # row_no: 데이터 행 기준 1부터
@@ -145,9 +213,7 @@ def _parse(filename: str, content: bytes) -> _Parsed:
                     {"file": filename, "row": row_no, "column": column, "value": record[column]},
                 ) from None
 
-    return _Parsed(
-        platform, period, metric_columns, df[PRODUCT_ID_COLUMN].tolist(), df[PRODUCT_NAME_COLUMN].tolist(), metrics
-    )
+    return _Parsed(platform, periods, field_map, df[id_column].tolist(), df[name_column].tolist(), metrics)
 
 
 def preview_file(filename: str, content: bytes) -> dict:
@@ -165,7 +231,7 @@ def preview_file(filename: str, content: bytes) -> dict:
     return {
         "filename": filename,
         "platform": parsed.platform,
-        "periods": [parsed.period],
+        "periods": sorted(set(parsed.periods)),
         "row_count": len(parsed.product_names),
         "columns": columns,
         "preview": preview,
@@ -178,24 +244,35 @@ def normalize_files(files: list[tuple[str, bytes]]) -> pd.DataFrame:
     금액·수량은 int 로 반올림한다 (B 의 스키마가 정수만 받는다). 행은 기간·플랫폼·상품ID 순.
     오류는 preview_file 과 같고, 어느 파일인지는 details.file 로 구분된다.
     routers/analyze.py 가 호출한다.
+
+    스마트스토어 판매 분석 파일이 있으면 STORE_FIELDS 5개 컬럼이 붙고(그 외 파일의 행은 None), 광고 지표는 0 이다.
+    일자별로 내려받아 같은 월·상품이 여러 행이면 합친다.
     """
     frames = []
     for filename, content in files:
         parsed = _parse(filename, content)
-        common = {
-            field: [int(round(v)) for v in parsed.metrics[column]]
-            for field, column in PLATFORM_COLUMN_MAP[parsed.platform].items()
-        }
-        frames.append(
-            pd.DataFrame(
-                {
-                    "period": parsed.period,
-                    "platform": parsed.platform,
-                    "product_id": parsed.product_ids,
-                    "product_name": parsed.product_names,
-                    **common,
-                }
-            )
+        values = {field: [int(round(v)) for v in parsed.metrics[column]] for field, column in parsed.field_map.items()}
+        frame = pd.DataFrame(
+            {
+                "period": parsed.periods,
+                "platform": parsed.platform,
+                "product_id": parsed.product_ids,
+                "product_name": parsed.product_names,
+                **values,
+            }
         )
+        if parsed.is_smartstore:
+            frame["ad_spend"] = 0
+            frame["ad_revenue"] = 0
+            keys = ["period", "platform", "product_id"]
+            names = frame.groupby(keys, sort=False)["product_name"].first()
+            frame = frame.drop(columns="product_name").groupby(keys, sort=False).sum().join(names).reset_index()
+        frames.append(frame)
     df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=NORMALIZED_COLUMNS)
-    return df[NORMALIZED_COLUMNS].sort_values(["period", "platform", "product_id"], kind="stable").reset_index(drop=True)
+    if any(field in df.columns for field in STORE_FIELDS):
+        df = df.reindex(columns=NORMALIZED_COLUMNS + STORE_FIELDS)
+        for field in STORE_FIELDS:  # 스마트스토어가 아닌 파일의 행은 NaN → None (JSON null)
+            df[field] = df[field].astype(object).where(df[field].notna(), None)
+    else:
+        df = df[NORMALIZED_COLUMNS]
+    return df.sort_values(["period", "platform", "product_id"], kind="stable").reset_index(drop=True)

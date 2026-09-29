@@ -5,7 +5,7 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_serializer
 
 Platform = Literal["coupang", "naver"]
 
@@ -74,6 +74,9 @@ class Comparison(BaseModel):
     trend: list[TrendPoint]
 
 
+STORE_ROW_FIELDS = ("gross_revenue", "visits", "refund_count", "refund_amount", "discount_amount")
+
+
 class Row(BaseModel):
     period: str
     platform: Platform
@@ -84,6 +87,82 @@ class Row(BaseModel):
     units: int
     ad_spend: Won
     ad_revenue: Won
+    # 스마트스토어 판매 분석 파일의 행만 값이 있다 (그 외 None)
+    gross_revenue: Won | None = None
+    visits: int | None = None
+    refund_count: int | None = None
+    refund_amount: Won | None = None
+    discount_amount: Won | None = None
+
+    @model_serializer(mode="wrap")
+    def _drop_empty_store_fields(self, handler):
+        """스마트스토어가 아닌 행은 기존 9개 필드 계약 그대로 내보낸다."""
+        data = handler(self)
+        return {k: v for k, v in data.items() if k not in STORE_ROW_FIELDS or v is not None}
+
+
+# ---- 스마트스토어 판매 분석 (퍼널·수익 품질) ----
+class StoreValues(BaseModel):
+    visits: int
+    orders: int
+    units: int
+    gross_revenue: Won
+    revenue: Won  # 판매금액(순)
+    refund_count: int
+    refund_amount: Won
+    discount_amount: Won
+    conversion_rate: float | None  # 결제건수/방문수 (%)
+    net_ratio: float | None  # 순매출/총매출 (%)
+    refund_rate: float | None  # 환불건수/결제건수 (%)
+    refund_amount_rate: float | None  # 환불금액/총매출 (%)
+    discount_rate: float | None  # 전체 할인액/총매출 (%)
+    aov: Won | None  # 총매출/결제건수
+
+
+class StoreChange(BaseModel):
+    visits_change: float | None
+    orders_change: float | None
+    gross_revenue_change: float | None
+    revenue_change: float | None
+    aov_change: float | None
+    conversion_rate_change_pp: float | None
+    net_ratio_change_pp: float | None
+    refund_rate_change_pp: float | None
+    refund_amount_rate_change_pp: float | None
+    discount_rate_change_pp: float | None
+
+
+class StoreProduct(BaseModel):
+    product_id: str
+    product_name: str
+    visits: int
+    orders: int
+    gross_revenue: Won
+    revenue: Won
+    conversion_rate: float | None
+    refund_rate: float | None
+    discount_rate: float | None
+    aov: Won | None
+    refund_rate_change_pp: float | None
+    conversion_rate_change_pp: float | None
+
+
+class StoreTrendPoint(BaseModel):
+    period: str
+    visits: int
+    orders: int
+    revenue: Won
+    conversion_rate: float | None
+
+
+class StoreKPIs(BaseModel):
+    period: str
+    previous_period: str | None
+    current: StoreValues
+    previous: StoreValues | None
+    change: StoreChange
+    products: list[StoreProduct]
+    trend: list[StoreTrendPoint]
 
 
 class Signal(BaseModel):
@@ -112,6 +191,7 @@ class AnalyzeResponse(BaseModel):
     rows: list[Row]
     signals: list[Signal]
     insight: Insight
+    store: StoreKPIs | None = None  # 스마트스토어 판매 분석 파일이 없으면 None
 
 
 # ---- 오류 ----

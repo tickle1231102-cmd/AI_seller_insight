@@ -3,12 +3,13 @@
 - 검증일: 2026-09-29
 - 최초 기준 main: `7b2f4af42d62cc2a197debe0bd94cc28f4c19374`
 - A 리뷰 보완 검증 시 통합한 main: `02ea3d5d43cd7b747202efb4513645f2eff8d5fb`
+- 최신 main 충돌 통합 기준: `773396e6cca15b71b22bf7df8c0b8f9c43932d9a`
 - 대상: PR #2의 C 리뷰 중 인사이트 출력 안전성 3건
 - 범위: D의 AI 코드·프롬프트·테스트만 수정. B/C 구현, 공통 계약, 프론트엔드는 변경하지 않음.
 
 ## 반영 내용
 
-1. OpenAI에 요청하는 `InsightContent`는 설명 필드 5개만 포함한다. `status`, `plan`, `answer`, `reason`은 모델 출력 대상이 아니다.
+1. OpenAI에 요청하는 `InsightDraft`는 설명 필드 5개만 포함한다. 이전 PR #10 이름 `InsightContent`는 같은 클래스의 호환 별칭이다. `status`, `plan`, `answer`, `reason`은 모델 출력 대상이 아니다.
 2. 최종 응답은 서버가 새로 구성한다. 질문이 없으면 `plan=null`, `answer=[]`이며, 질문이 있으면 호출자가 넘긴 계획·계산 결과를 유지한다. 유효한 설명의 상태는 서버가 `ok`로 정한다.
 3. `evidence`의 근거 없는 숫자는 기존 계약대로 항목을 제거한다. `summary`, `checks`, `actions`, `limitations`에 근거 없는 숫자가 있으면 설명 전체를 `llm_error`로 처리한다. 원래 계획·답과 KPI는 유지한다.
 4. 쉼표, Unicode 마이너스, 소수점, 지수 표기 숫자를 검사한다. 계획의 `limit`는 판매 수치의 근거로 인정하지 않는다.
@@ -52,6 +53,26 @@
 
 초기 161개와 현재 280개는 겹치는 테스트이므로 합산하지 않는다. 루트/backend 재실행도 같은 사례다. 최신 main 통합 후에도 전체 280개를 재실행해 통과했다. 유료 smoke test에는 공개 fixture 집계값만 전송했으며, 키와 실제 판매 파일을 출력·복사·커밋하지 않았다. 유료 실행의 pytest 캐시 쓰기 권한 경고 1건은 테스트 결과에 영향을 주지 않았다. planner 10문항 유료 정확도 검증 및 배포 화면 E2E를 이번에 완료했다는 의미는 아니다.
 
+## 최신 main 충돌 통합 검증
+
+PR #12의 스키마·타임아웃 수정 및 main의 스마트스토어 판매 분석을 함께 반영했다. 충돌 파일은 `backend/app/ai/insight.py`, `backend/app/ai/models.py`, `backend/tests/test_insight.py` 3개였다.
+
+- main의 `InsightDraft` 이름을 유지하되 설명 5개 필드만 LLM 생성 대상으로 삼는다. `InsightContent`는 호환 별칭으로 유지해 중복 스키마가 없다. 최종 상태·plan·answer·reason은 서버가 결정하는 정책을 유지한다.
+- PR #12의 `LLM_TIMEOUT_SECONDS` 읽기, 기본 30초, 명시적 인자 우선순위를 그대로 보존했다. client·config·`.env.example`은 main과 동일하다.
+- 스마트스토어의 analysis·router·응답 스키마·fixtures 및 프론트엔드는 main과 동일하게 보존했다. 공통 계약을 별도로 변경하지 않았다.
+- 새 D 통합 회귀 테스트 10개를 추가했다: 스키마/호환 이름 1개, 타임아웃 설정 5개, 스마트스토어 Excel+쿠팡 CSV 혼합 업로드의 질문 유무·정상/비정상 AI 응답 4개.
+
+| 검증 | 결과 |
+|---|---|
+| 루트에서 백엔드 비유료 전체 | 310 passed, 2 deselected |
+| backend 폴더에서 동일 테스트 전체 | 310 passed, 2 deselected |
+| 실제 OpenAI 인사이트 smoke test | 1 passed (gpt-6-luna, 8.01초) |
+| 혼합 파일의 KPI·store·comparison·signals·plan·answer 보존 | 위 전체 테스트의 4개 사례에서 통과 |
+
+310개에는 이전 회귀 사례, main의 스마트스토어 20개 사례, 이번 D 통합 회귀 10개가 포함되어 있다. 이전 161/280개 및 루트/backend 실행 횟수와 합산하지 않는다. 유료 호출은 공개 CSV fixture의 집계 KPI·비교·신호만 사용했으며, 키는 기존 ignored `.env`에서 프로세스 메모리로만 읽고 출력·복사·커밋하지 않았다.
+
+혼합 업로드 검증은 기존 AI 설명 및 새 `store` 응답의 보존 검증이다. 현재 B 라우터는 `store` 지표를 별도로 AI 입력에 전달하지 않으므로, 스마트스토어 전용 전환율·환불률 인사이트를 새로 구현했다는 의미는 아니다. 배포 화면 E2E 및 기존 planner 10문항 유료 정확도 검증도 이번 범위가 아니다.
+
 ## 재현
 
 ```bash
@@ -63,7 +84,7 @@ pytest backend/tests -q -m 'not integration'
 ## 한계와 별도 작업
 
 - 숫자 검증은 입력에 해당 숫자가 존재하는지 검사한다. 플랫폼·지표의 의미가 정확히 연결됐는지, 숫자가 없는 원인 추론까지 올바른지는 보장하지 않는다. 전체 WU-AI-04 의미·품질 검증은 별도다.
-- `LLM_MODE`의 mock/real 선택과 `LLM_TIMEOUT_SECONDS` 설정 연결은 이번 인사이트 안전성 수정 범위에 포함하지 않는다. 이를 구현·검증했다는 의미가 아니다.
+- `LLM_MODE`의 mock/real 전환은 여전히 별도다. `LLM_TIMEOUT_SECONDS` 연결은 최초 D 수정에는 없었으나, 이번 통합에서 main의 PR #12 구현(기본 30초)을 보존하고 설정 회귀 테스트로 검증했다.
 - 배포 환경의 업로드부터 프론트엔드 표시까지 전체 E2E는 별도다. Vercel의 성공 상태나 배포 생략은 이 테스트를 대신하지 않는다.
 
 출력 스키마 분리에는 [OpenAI Structured Outputs 안내](https://developers.openai.com/api/docs/guides/structured-outputs)를 참고했다. 형식 검증만으로 내용의 정확성이 보장되지 않으므로 서버 후처리를 함께 적용했다.

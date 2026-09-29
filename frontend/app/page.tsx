@@ -7,6 +7,7 @@ import { UploadPanel } from "@/features/upload/UploadPanel";
 import { KpiCards } from "@/features/dashboard/KpiCards";
 import { TrendChart } from "@/features/dashboard/TrendChart";
 import { PlatformCompare } from "@/features/dashboard/PlatformCompare";
+import { StoreSection } from "@/features/dashboard/StoreSection";
 import { SignalBadges } from "@/features/dashboard/SignalBadges";
 import { InsightPanel } from "@/features/insight/InsightPanel";
 import { ChatPanel, type ChatMessage } from "@/features/insight/ChatPanel";
@@ -136,6 +137,7 @@ export default function Home() {
 
           <KpiCards kpis={result.kpis} />
           <SignalBadges signals={result.signals} />
+          {result.store && <StoreSection store={result.store} />}
 
           <div className="main-row">
             <div className="left-col">

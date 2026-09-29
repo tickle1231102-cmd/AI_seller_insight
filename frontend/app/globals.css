@@ -276,3 +276,19 @@ td { padding: 10px; border-top: 1px solid var(--border); white-space: nowrap; }
   .compare { grid-template-columns: minmax(0, 1fr); }
   .counter { display: none; }
 }
+
+/* 스마트스토어 판매 분석 */
+.store { display: flex; flex-direction: column; gap: 14px; }
+.kpi.soft { background: var(--soft); border-radius: 10px; }
+.sub-title { font-size: 13px; font-weight: 600; margin-top: 4px; }
+.funnel { display: flex; align-items: stretch; gap: 8px; }
+.funnel-step { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 14px; border-radius: 10px; background: var(--primary-soft); }
+.funnel-arrow { flex: 0 0 96px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px; font-size: 12px; text-align: center; }
+.funnel-step .kpi-value { font-size: 18px; }
+.funnel-arrow::after { content: "→"; color: var(--muted); font-size: 18px; }
+.badge.inline { margin-left: 6px; font-size: 11px; vertical-align: middle; }
+@media (max-width: 768px) {
+  .funnel { flex-direction: column; }
+  .funnel-step, .funnel-arrow { flex: none; }
+  .funnel-arrow::after { content: "↓"; }
+}
