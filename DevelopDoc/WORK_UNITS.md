@@ -63,7 +63,7 @@
 
 **완료 조건**
 - [x] Collaborator 3명 초대 완료, 4명 모두 Clone 성공
-- [ ] `main` 브랜치 보호 규칙 설정 (PR 필수, 승인 1명 이상) — ⏳ 확인 필요: `02ea3d5`(README) 가 PR 없이 main 에 들어감, 저장소 주인 설정 확인
+- [ ] `main` 브랜치 보호 규칙 설정 (PR 필수, 승인 1명 이상) — ⏳ **설정 안 됨** (`gh api repos/.../branches/main` → `protected: false`, rulesets 0개). `02ea3d5`(README) 가 PR 없이 main 에 들어감. 관리자 직접 push 는 규칙이 있어도 우회될 수 있음 → 저장소 주인(Admin) 설정 필요
 - [x] `.gitignore` 에 `.env`, `node_modules/`, `.venv/`, `__pycache__/` 포함
 - [ ] 4명 모두 Branch → PR → Review → Merge 1회 이상 경험 — ⏳ B(#4)·C(#3)는 승인 후 merge. A(#1)·D(#2)는 리뷰 승인 없이 merge됨
 
@@ -299,7 +299,7 @@
 - **담당:** B · **리뷰:** C
 
 **완료 조건**
-- [x] Render 에 Backend 배포, 배포 URL `/health` 정상
+- [x] Render 에 Backend 배포, 배포 URL `/health` 정상 (PR #12 `380104f` 까지 반영. Public Git Repository 연결이라 main 의 `backend/app/`·`requirements.txt` 변경이 merge 되면 **Render 에서 수동 재배포** 필요)
 - [ ] Render 환경변수(`LLM_API_KEY`, `LLM_MODEL`, `ALLOWED_ORIGINS`) 설정 — ⏳ `ALLOWED_ORIGINS` 만 설정됨. API 키 전달 대기
 - [ ] Vercel 에 Frontend 배포, `NEXT_PUBLIC_API_BASE_URL` 이 Render URL — ⏳ Vercel 배포는 됨. 환경변수가 비어 mock 모드 (A 설정 대기)
 - [ ] 배포된 Frontend 에서 CORS 오류 없이 `/api/analyze` 호출 성공 — ⏳ 백엔드 CORS 허용 완료. 위 Vercel 설정 후 확인
