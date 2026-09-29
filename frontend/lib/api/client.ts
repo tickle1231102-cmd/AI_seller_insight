@@ -25,6 +25,8 @@ const MESSAGES: Record<string, (d?: Record<string, unknown>) => string> = {
     `${d?.file ? `${d.file}: ` : ""}필수 컬럼이 없습니다${Array.isArray(d?.missing) ? ` (${d.missing.join(", ")})` : ""}.`,
   INVALID_NUMBER: (d) =>
     `${d?.file ? `${d.file}: ` : ""}숫자로 읽을 수 없는 값이 있습니다${d?.row ? ` (${d.row}행${d?.column ? ` · ${d.column}` : ""})` : ""}.`,
+  UNSUPPORTED_DATASET: (d) =>
+    `${d?.file ? `${d.file}: ` : ""}스마트스토어 ${d?.dataset ?? ""} 분석 파일은 아직 지원하지 않습니다. 판매 분석(SALES) 파일을 올려주세요.`,
   UNKNOWN_PLATFORM: (d) => `${d?.file ? `${d.file}: ` : ""}쿠팡·네이버 리포트 형식이 아닙니다.`,
   QUESTION_TOO_LONG: () => `질문은 ${MAX_QUESTION_LENGTH}자 이내로 입력해주세요.`,
   INTERNAL_ERROR: () => "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",

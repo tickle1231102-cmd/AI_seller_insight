@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import type { AnalyzeResponse, PreviewFile } from "@/types/api";
 import { analyzeFiles, ApiRequestError, previewFiles, USE_MOCK, validateFiles } from "@/lib/api/client";
+import { platformLabel } from "@/lib/format";
 import { UploadPanel } from "@/features/upload/UploadPanel";
 import { KpiCards } from "@/features/dashboard/KpiCards";
 import { TrendChart } from "@/features/dashboard/TrendChart";
@@ -127,7 +128,7 @@ export default function Home() {
             <span className="chip">전체 플랫폼</span>
             {result.comparison.by_platform.map((p) => (
               <span key={p.platform} className="chip">
-                {p.platform === "coupang" ? "쿠팡" : "네이버"}
+                {platformLabel(p.platform)}
               </span>
             ))}
             <span className="grow" />

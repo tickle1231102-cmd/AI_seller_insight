@@ -45,6 +45,9 @@ SMARTSTORE_SALES_MAP: dict[str, str] = {
 SMARTSTORE_ID_COLUMN = "채널상품번호"
 SMARTSTORE_NAME_COLUMN = "채널상품명"
 SMARTSTORE_DATE_COLUMN = "날짜"
+# 스마트스토어 판매 분석은 광고 리포트(naver)와 같은 판매액이 겹칠 수 있어 별도 platform 으로 분리한다.
+# kpis·comparison·신호·질문 실행은 이 platform 을 제외하고 계산하고, store 섹션과 rows 에만 나온다.
+STORE_PLATFORM = "naver_store"
 SMARTSTORE_SALES_KEYS = {SMARTSTORE_ID_COLUMN, SMARTSTORE_NAME_COLUMN, "판매금액(총)"}
 # 스마트스토어 방문·검색·고객 분석 파일. 판별만 하고 분석은 아직 지원하지 않는다 (WORK_UNITS P1).
 SMARTSTORE_OTHER_KEYS = {"visit": {"경로(1단계)", "방문수"}, "query": {"검색어", "방문수"}, "customer": {"고객분류", "방문고객수"}}
@@ -148,10 +151,13 @@ def _extract_period(filename: str) -> str:
     return period
 
 
-def _to_number(raw: str) -> int | float:
-    """TECH_SPEC 4-2: ',' '원' 공백 제거 후 숫자 변환. 빈 셀은 0. 변환 불가면 ValueError."""
+def _to_number(raw: str, *, dash_is_zero: bool = False) -> int | float:
+    """TECH_SPEC 4-2: ',' '원' 공백 제거 후 숫자 변환. 빈 셀은 0. 변환 불가면 ValueError.
+
+    dash_is_zero: 스마트스토어 판매 분석 파일은 값이 없으면 '-' 로 적으므로 이 파일에서만 0 으로 본다.
+    """
     text = raw.replace(",", "").replace("원", "").replace(" ", "")
-    if text in ("", "-"):  # 스마트스토어 내보내기는 값이 없으면 '-' 로 적는다
+    if text == "" or (dash_is_zero and text == "-"):
         return 0
     if not _NUMBER_RE.fullmatch(text):  # float() 가 받아주는 nan, inf, 1e5, 1_000 은 숫자로 보지 않는다
         raise ValueError(raw)
@@ -174,7 +180,7 @@ def _parse(filename: str, content: bytes) -> _Parsed:
     df = _read_table(filename, content)
     columns = list(df.columns)
     if SMARTSTORE_SALES_KEYS <= set(columns):
-        platform, field_map = "naver", SMARTSTORE_SALES_MAP
+        platform, field_map = STORE_PLATFORM, SMARTSTORE_SALES_MAP
         id_column, name_column = SMARTSTORE_ID_COLUMN, SMARTSTORE_NAME_COLUMN
     else:
         _reject_other_smartstore(filename, columns)
@@ -204,7 +210,7 @@ def _parse(filename: str, content: bytes) -> _Parsed:
     for row_no, record in enumerate(df[metric_columns].to_dict("records"), start=1):  # row_no: 데이터 행 기준 1부터
         for column in metric_columns:
             try:
-                metrics[column].append(_to_number(record[column]))
+                metrics[column].append(_to_number(record[column], dash_is_zero=field_map is SMARTSTORE_SALES_MAP))
             except ValueError:
                 raise AppError(
                     "INVALID_NUMBER",
