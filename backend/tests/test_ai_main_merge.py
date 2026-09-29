@@ -40,12 +40,16 @@ def test_mixed_smartstore_upload_preserves_store_and_caller_results(monkeypatch,
              fixtures / "coupang_2026-09.csv"]
     uploads = [(p.name, p.read_bytes()) for p in paths]
     df = normalize.normalize_files(uploads)
-    expected_kpis = kpi.compute_kpis(df)
+    # PR #17 keeps overlapping SmartStore sales out of the ad-report/AI
+    # scope. The store panel and raw rows still include the uploaded sheets.
+    core = df[df["platform"] != normalize.STORE_PLATFORM]
+    assert set(core["platform"]) == {"coupang"}
+    expected_kpis = kpi.compute_kpis(core)
     expected_store = kpi.compute_store_kpis(df)
-    expected_comparison = compare.build_comparison(df)
+    expected_comparison = compare.build_comparison(core)
     expected_signals = signals.detect_signals(expected_kpis, expected_comparison)
     plan = AnalysisPlan(metric="revenue", group_by="platform", sort="desc")
-    answer = compare.run_plan(df, plan) if with_question else []
+    answer = compare.run_plan(core, plan) if with_question else []
     from backend.tests.test_insight import selection
 
     class FakeLLM:
