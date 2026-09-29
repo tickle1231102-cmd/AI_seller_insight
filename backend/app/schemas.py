@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, model_serializer
 
-Platform = Literal["coupang", "naver"]
+Platform = Literal["coupang", "naver", "naver_store"]
 
 # 금액(원)은 정수. KRW 는 소수점이 없고 12600000.0 처럼 직렬화되지 않게 한다.
 Won = int

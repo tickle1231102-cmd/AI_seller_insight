@@ -111,7 +111,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | 필드 | 타입 | 설명 |
 |---|---|---|
 | `period` | string (`YYYY-MM`) | 기간 (원본 컬럼이 아니라 **파일명**의 `YYYY-MM` 에서 추출. 앞뒤에 숫자가 붙지 않은 것, 예: `coupang_2026-09.csv`) |
-| `platform` | string (`coupang` \| `naver`) | 플랫폼 |
+| `platform` | string (`coupang` \| `naver` \| `naver_store`) | 플랫폼 (`naver_store` 는 4-3 참고) |
 | `product_id` | string | 상품 ID |
 | `product_name` | string | 상품명 |
 | `revenue` | integer (원) | 매출 |
@@ -143,7 +143,19 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 - 데이터 행 0개 → `EMPTY_FILE` 오류
 - 빈 숫자 셀 → 0 으로 처리
 - 금액·수량 5개 필드(`revenue`, `orders`, `units`, `ad_spend`, `ad_revenue`)는 정수로 반올림 (Python `round` 라 `.5` 는 짝수 쪽으로)
-- 파일명에서 `YYYY-MM` 을 찾지 못함 → `INVALID_PERIOD` 오류
+- 파일명에서 기간을 찾지 못함 → `INVALID_PERIOD` 오류. 기간은 `YYYY-MM` 이 우선이고, 없으면 날짜 범위(`YYYYMMDD-YYYYMMDD` 등, 첫·끝 날짜의 중간이 속한 월)를 쓴다. 예: `sales_20260830-20260928.xlsx` → `2026-09`
+- 셀 값 `-` 는 스마트스토어 판매 분석 파일에서만 0 으로 본다. 그 외 파일에서는 `INVALID_NUMBER`
+
+### 4-3. 스마트스토어 판매 분석 (`naver_store`)
+
+네이버 스마트스토어 통계 > 판매 분석(SALES) 내보내기 파일을 올리면 `platform="naver_store"` 로 정규화한다. 광고 리포트(`naver`)와 같은 판매액이 겹칠 수 있으므로 **합산하지 않고 분리**한다.
+
+- 판별: 컬럼에 `채널상품번호`, `채널상품명`, `판매금액(총)` 이 모두 있으면 스토어 판매 파일이다.
+- 매핑: `revenue`=판매금액(순), `orders`=상품결제건수, `units`=결제상품수량. `ad_spend`·`ad_revenue` 는 0. 추가 지표 `gross_revenue`(판매금액(총)), `visits`(방문수), `refund_count`, `refund_amount`, `discount_amount`(전체 할인액) 는 스토어 행에만 값이 있다 (그 외 행은 응답에서 필드 자체가 빠진다).
+- 기간: 행의 `날짜` 범위 중간이 속한 월, 없으면 파일명. 일자별 행은 월·상품별로 합친다.
+- **`kpis`·`comparison`·`signals`·질문 실행(`run_plan`)은 `naver_store` 행을 제외하고 계산**한다. `rows` 와 `store` 에만 나온다. 스토어 파일만 올리면 제외할 행이 없으므로 그 행으로 계산한다.
+- `store` (응답 최상위, 스토어 파일이 없으면 `null`): 스토어 데이터의 최신 월·직전 월 기준 `current`/`previous`/`change`(퍼널·환불률·할인율·객단가), 상품별 `products`(최대 10개), `trend`.
+- 방문·검색어·고객 분석 파일은 아직 지원하지 않으며 `UNSUPPORTED_DATASET` 오류를 낸다 (P1).
 
 ## 5. KPI 계산 명세
 
@@ -209,7 +221,8 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | `MISSING_COLUMNS` | 422 | 필수 컬럼 누락 |
 | `INVALID_NUMBER` | 422 | 숫자 변환 실패 |
 | `UNKNOWN_PLATFORM` | 422 | 플랫폼 판별 불가 |
-| `INVALID_PERIOD` | 422 | 파일명에서 `YYYY-MM` 기간을 찾지 못함 |
+| `UNSUPPORTED_DATASET` | 422 | 스마트스토어 방문·검색어·고객 분석 파일 (판매 분석만 지원) |
+| `INVALID_PERIOD` | 422 | 파일명에서 기간(`YYYY-MM` 또는 날짜 범위)을 찾지 못함 |
 | `QUESTION_TOO_LONG` | 400 | 질문 길이 초과 |
 | `NOT_FOUND` | 404 | 없는 주소 |
 | `METHOD_NOT_ALLOWED` | 405 | 잘못된 요청 방식 |

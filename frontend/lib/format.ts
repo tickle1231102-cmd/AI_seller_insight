@@ -15,6 +15,7 @@ export const formatBytes = (b: number) =>
 export const PLATFORM_LABEL: Record<Platform, string> = {
   coupang: "쿠팡",
   naver: "네이버",
+  naver_store: "네이버 스토어",
 };
 
 export const platformLabel = (p: string) => PLATFORM_LABEL[p as Platform] ?? p;
