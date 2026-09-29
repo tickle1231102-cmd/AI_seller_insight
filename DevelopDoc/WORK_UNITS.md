@@ -82,10 +82,10 @@
 - **담당:** C · **리뷰:** D
 
 **완료 조건**
-- [ ] `shared/fixtures/` 에 쿠팡 8월·9월, 네이버 8월·9월 샘플 파일 (xlsx 또는 csv)
-- [ ] 정답 파일 (`expected_kpis.json`) 에 전체·플랫폼별 KPI 및 변화율 기록
-- [ ] 정답이 TECH_SPEC 5-1 예시(매출 +21.2%, 광고비 +28.0%, ROAS −14.2%p)와 일치
-- [ ] 실패용 fixture: 빈 파일, 컬럼 누락, 잘못된 숫자, 미지원 플랫폼 각 1개
+- [x] `shared/fixtures/` 에 쿠팡 8월·9월, 네이버 8월·9월 샘플 파일 (xlsx 또는 csv)
+- [ ] 정답 파일 (`expected_kpis.json`) 에 전체·플랫폼별 KPI 및 변화율 기록 — ⏳ 전체 KPI·변화율(`kpis.change`)과 플랫폼별 최신 월 값(`by_platform`)은 있으나 **플랫폼별 변화율은 없음**. 응답 계약(TECH_SPEC 7-4)에 없는 값이라 정답 파일만 늘릴지 계약을 바꿀지 팀 판단 필요
+- [x] 정답이 TECH_SPEC 5-1 예시(매출 +21.2%, 광고비 +28.0%, ROAS −14.2%p)와 일치
+- [x] 실패용 fixture: 빈 파일, 컬럼 누락, 잘못된 숫자, 미지원 플랫폼 각 1개
 
 ---
 
@@ -140,23 +140,23 @@
 - **담당:** C · **리뷰:** D
 
 **완료 조건**
-- [ ] `normalize.py` 에 `PLATFORM_COLUMN_MAP` 상수 (쿠팡·네이버)
-- [ ] xlsx·csv 모두 읽기 가능 (UTF-8, CP949 인코딩 CSV 처리)
-- [ ] 플랫폼 자동 판별 (컬럼 구조 기준, 불가 시 `UNKNOWN_PLATFORM`)
-- [ ] 숫자 정제 (`,`, `원`, 공백 제거), 실패 시 `INVALID_NUMBER` (파일·행·컬럼 정보 포함)
-- [ ] 필수 컬럼 누락 시 `MISSING_COLUMNS` (누락 목록 포함), 빈 파일 `EMPTY_FILE`
-- [ ] 출력 DataFrame 이 공통 스키마 9개 필드와 타입을 정확히 가짐
-- [ ] `test_analysis.py` 에 정상 4종 + 실패 4종 테스트 통과
+- [x] `normalize.py` 에 `PLATFORM_COLUMN_MAP` 상수 (쿠팡·네이버)
+- [x] xlsx·csv 모두 읽기 가능 (UTF-8, CP949 인코딩 CSV 처리) (`test_normalize.py::test_csv_with_bom_and_cp949`, `test_xlsx_gives_same_result_as_csv`)
+- [x] 플랫폼 자동 판별 (컬럼 구조 기준, 불가 시 `UNKNOWN_PLATFORM`)
+- [x] 숫자 정제 (`,`, `원`, 공백 제거), 실패 시 `INVALID_NUMBER` (파일·행·컬럼 정보 포함)
+- [x] 필수 컬럼 누락 시 `MISSING_COLUMNS` (누락 목록 포함), 빈 파일 `EMPTY_FILE`
+- [x] 출력 DataFrame 이 공통 스키마 9개 필드와 타입을 정확히 가짐 (`test_normalize_files_schema_and_dtypes`)
+- [x] `test_analysis.py` 에 정상 4종 + 실패 4종 테스트 통과 (`test_normalize_files_each_normal_fixture`, `test_normalize_files_each_failure_fixture`)
 
 ### WU-DA-03 KPI 계산
 - **담당:** C · **리뷰:** D
 
 **완료 조건**
-- [ ] `kpi.py` 에서 매출·주문·판매량·광고비·광고매출 합계, ROAS 계산
-- [ ] 광고비 0 → ROAS `null`
-- [ ] 기간·플랫폼 단위 집계 가능
-- [ ] fixture 기준 결과가 `expected_kpis.json` 과 정확히 일치
-- [ ] 같은 입력으로 반복 실행 시 결과 동일
+- [x] `kpi.py` 에서 매출·주문·판매량·광고비·광고매출 합계, ROAS 계산
+- [x] 광고비 0 → ROAS `null` (`test_zero_ad_spend_gives_null_roas_not_zero_or_inf`)
+- [x] 기간·플랫폼 단위 집계 가능 (`test_totals_aggregate_by_period_and_platform`)
+- [x] fixture 기준 결과가 `expected_kpis.json` 과 정확히 일치 (`test_compute_kpis_matches_expected`, 배포 서버에서도 일치 확인)
+- [x] 같은 입력으로 반복 실행 시 결과 동일 (`test_repeated_runs_and_input_order_give_identical_results`)
 
 ### WU-AI-01 LLM 클라이언트 · 실패 처리
 - **담당:** D · **리뷰:** A
@@ -187,22 +187,22 @@
 - **담당:** C · **리뷰:** D
 
 **완료 조건**
-- [ ] `compare.py` 에서 최신 월 vs 직전 월 증감률(%) 및 ROAS 증감(%p) 계산
-- [ ] 전월 값 0 → 증감률 `null`
-- [ ] 데이터가 한 달뿐이면 `change` 는 `null`, 오류 없이 반환
-- [ ] `by_platform`, `trend` 생성
-- [ ] `run_plan(df, plan)` 이 `AnalysisPlan` 을 받아 정렬·그룹·limit 적용 결과 반환
-- [ ] fixture 결과가 매출 +21.2%, 광고비 +28.0%, ROAS −14.2%p 로 일치
+- [x] `compare.py` 에서 최신 월 vs 직전 월 증감률(%) 및 ROAS 증감(%p) 계산 (실제 구현 위치는 `kpi.py::compute_kpis`, `compare.py` 는 플랫폼 비교·추이·계획 실행 담당)
+- [x] 전월 값 0 → 증감률 `null` (`test_previous_zero_revenue_change_is_null`)
+- [x] 데이터가 한 달뿐이면 `change` 는 `null`, 오류 없이 반환 (`test_single_month_has_no_previous`)
+- [x] `by_platform`, `trend` 생성 (`test_build_comparison_matches_expected`)
+- [x] `run_plan(df, plan)` 이 `AnalysisPlan` 을 받아 정렬·그룹·limit 적용 결과 반환 (`test_run_plan_*`, D 의 `AnalysisPlan` 모델로도 실행 확인)
+- [x] fixture 결과가 매출 +21.2%, 광고비 +28.0%, ROAS −14.2%p 로 일치 (`test_compute_kpis_matches_expected`)
 
 ### WU-DA-05 이상 신호 계산
 - **담당:** C · **리뷰:** D
 
 **완료 조건**
-- [ ] `signals.py` 에 `ROAS_DOWN_WITH_SPEND_GROWTH`, `REVENUE_DOWN`, `LOW_ROAS_PLATFORM` 구현
-- [ ] 임계값이 상수로 분리됨
-- [ ] 각 신호가 TECH_SPEC 6장의 필드를 포함
-- [ ] fixture 에서 `ROAS_DOWN_WITH_SPEND_GROWTH` 가 `ad_spend_change: 28.0`, `ad_revenue_change: 22.4`, `roas_change_pp: -14.2` 로 감지
-- [ ] 조건 미충족 데이터에서 신호가 발생하지 않는 테스트 통과
+- [x] `signals.py` 에 `ROAS_DOWN_WITH_SPEND_GROWTH`, `REVENUE_DOWN`, `LOW_ROAS_PLATFORM` 구현
+- [x] 임계값이 상수로 분리됨 (`signals.py::LOW_ROAS_RATIO`)
+- [x] 각 신호가 TECH_SPEC 6장의 필드를 포함
+- [x] fixture 에서 `ROAS_DOWN_WITH_SPEND_GROWTH` 가 `ad_spend_change: 28.0`, `ad_revenue_change: 22.4`, `roas_change_pp: -14.2` 로 감지 (`test_detect_signals_matches_expected`)
+- [x] 조건 미충족 데이터에서 신호가 발생하지 않는 테스트 통과 (`test_no_signals_gives_empty_list`, `test_single_month_has_no_previous`)
 
 ### WU-AI-03 KPI 인사이트 생성
 - **담당:** D · **리뷰:** A
