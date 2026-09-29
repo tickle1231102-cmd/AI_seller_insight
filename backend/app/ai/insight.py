@@ -8,7 +8,7 @@ from typing import Any, Protocol, TypeVar
 from pydantic import BaseModel
 
 from .client import LLMClientError, OpenAIStructuredClient
-from .models import AnalysisPlan, Insight
+from .models import AnalysisPlan, Insight, InsightDraft
 from .prompts import INSIGHT_INSTRUCTIONS
 
 
@@ -102,7 +102,7 @@ def create_insight(
     generator = llm or OpenAIStructuredClient()
     try:
         generated = generator.generate_structured(
-            schema=Insight,
+            schema=InsightDraft,
             instructions=INSIGHT_INSTRUCTIONS,
             input_text=json.dumps(payload, ensure_ascii=False, default=str),
             max_output_tokens=800,
@@ -113,9 +113,10 @@ def create_insight(
     # Plan and answer are computed upstream; never let the explanation model
     # rewrite them while assembling the API response.
     filtered = _filter_evidence(generated.evidence, kpis, comparison, signals, answer)
-    updates: dict[str, Any] = {"evidence": filtered}
-    if plan is not None:
-        updates["plan"] = plan
-    if answer is not None:
-        updates["answer"] = list(answer)
-    return generated.model_copy(update=updates)
+    fields = generated.model_dump(include=set(InsightDraft.model_fields))
+    fields["evidence"] = filtered
+    return Insight(
+        **fields,
+        plan=plan,
+        answer=list(answer) if answer is not None else [],
+    )

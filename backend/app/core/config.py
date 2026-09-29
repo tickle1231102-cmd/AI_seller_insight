@@ -12,7 +12,7 @@ class Settings(BaseSettings):
 
     llm_api_key: str = ""
     llm_model: str = ""
-    llm_timeout_seconds: int = 15
+    llm_timeout_seconds: int = 30
     llm_mode: str = "mock"  # real | mock
     allowed_origins: str = "http://localhost:3000"
     max_files: int = 10
