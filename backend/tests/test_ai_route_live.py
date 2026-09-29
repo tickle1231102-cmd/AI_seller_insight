@@ -61,4 +61,3 @@ def test_real_openai_route_keeps_calculated_results_and_grounded_insight():
     assert insight["summary"]
     assert insight["evidence"]
     assert insight["limitations"]
-

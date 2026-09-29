@@ -53,6 +53,16 @@
 기존 버전 비교: `python -m backend.tests.ai_quality_runner --live --baseline 13844f1`
 실제 결과는 표준 출력 JSON으로만 제공한다. 토큰·비용을 무제한 사용하지 않도록 workers는 최대 3이다.
 
+## 다음 날 작업 사전 검증 (로컬 전용)
+
+- PR #18 위 로컬 브랜치 `prep/day3-d-ai-qa`에서 실행했으며 GitHub에는 게시하지 않았다.
+- 비유료 백엔드 전체: **351 passed, 3 deselected**. 새로 추가한 유료 실제 라우트 테스트가 기본 실행에서 제외되므로 deselected가 2개에서 3개로 늘었다.
+- 실제 `gpt-6-luna` 품질 평가 재실행: **30/30**(지원 15/15, 미지원 15/15).
+- 실제 인사이트 시나리오: **8개 status=ok**, 계산 결과 모순 1개는 API 호출 전 `llm_error(inconsistent_analysis_results)`로 차단. 9개 모두 입력과 호출자의 plan/answer를 보존했다.
+- 유료 통합 테스트 3개(Planner 10문항, 인사이트 smoke, 실제 `/api/analyze` 라우트)가 **3 passed**. 공개 fixture만 사용했고 실제 키는 출력·복사·커밋하지 않았다.
+- 첫 품질 실행은 샌드박스의 외부 네트워크 차단으로 공급자 오류가 발생해 제품 결과에서 제외했다. 네트워크 허용 상태에서 동일 테스트를 다시 실행한 위 결과만 유효한 최종 기록이다.
+- 내일 작업 순서와 외부 선행 조건은 `D_NEXT_DAY_CHECKLIST.md`에 분리했다.
+
 ## 17:17 메일 처리
 PR #16(`c326b14`)은 C의 WORK_UNITS DA-01~05 체크 상태 갱신이다.
 해당 C 코드/fixture와 동일한 버전의 test_analysis.py + test_normalize.py **81개 통과**를 확인했다.
