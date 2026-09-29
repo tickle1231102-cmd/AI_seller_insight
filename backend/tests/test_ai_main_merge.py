@@ -12,7 +12,7 @@ from app.main import app
 from app.routers import analyze as analyze_router
 from backend.app.ai.client import OpenAIStructuredClient
 from backend.app.ai.insight import create_insight
-from backend.app.ai.models import AnalysisPlan, Insight, PlannerResult
+from backend.app.ai.models import AnalysisPlan, PlannerResult
 
 
 @pytest.mark.parametrize("env_timeout, explicit_timeout, expected", [
@@ -46,16 +46,15 @@ def test_mixed_smartstore_upload_preserves_store_and_caller_results(monkeypatch,
     expected_signals = signals.detect_signals(expected_kpis, expected_comparison)
     plan = AnalysisPlan(metric="revenue", group_by="platform", sort="desc")
     answer = compare.run_plan(df, plan) if with_question else []
-    summary = ("매출 999999999999999원입니다." if unsafe
-               else f"9월 매출은 {expected_kpis['current']['revenue']:,}원입니다.")
+    from backend.tests.test_insight import selection
 
     class FakeLLM:
         def generate_structured(self, **kwargs):
             # A provider attempting metadata injection must not corrupt either
             # the new store response or the original upstream plan/answer.
-            return Insight(status="skipped", plan=AnalysisPlan(metric="roas"),
-                           answer=[{"revenue": 999999999999999}], reason="injected",
-                           summary=summary)
+            return {**selection(summary_fact_ids=["fabricated"] if unsafe else ["kpis.current.revenue"]),
+                    "status": "skipped", "plan": {"metric": "roas"},
+                    "answer": [{"revenue": 999999999999999}], "reason": "injected"}
 
     monkeypatch.setattr(analyze_router, "_load_ai", lambda: SimpleNamespace(
         create_analysis_plan=lambda question: PlannerResult(status="ok", plan=plan),
@@ -76,7 +75,10 @@ def test_mixed_smartstore_upload_preserves_store_and_caller_results(monkeypatch,
     assert insight["plan"] == (plan.model_dump() if with_question else None)
     assert insight["answer"] == answer
     assert insight["status"] == ("llm_error" if unsafe else "ok")
-    assert insight["summary"] == ("" if unsafe else summary)
+    if unsafe:
+        assert insight["summary"] == ""
+    else:
+        assert "매출:" in insight["summary"]
     assert "999999999999999" not in response.text
     # reason is internal to D's model, not part of B's public Insight schema.
     assert "reason" not in insight

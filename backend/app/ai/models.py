@@ -37,6 +37,7 @@ class PlannerDecision(BaseModel):
     status: Literal["ok", "unsupported_question"]
     plan: AnalysisPlan | None = None
     reason: str | None = None
+    unrepresented_constraints: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_plan_presence(self) -> "PlannerDecision":
@@ -78,6 +79,15 @@ class InsightDraft(BaseModel):
 
 # Preserve the earlier PR #10 import name without a second, divergent schema.
 InsightContent = InsightDraft
+
+
+class InsightSelection(BaseModel):
+    """Internal model output: IDs only. Public Insight remains unchanged."""
+
+    summary_fact_ids: list[str] = Field(max_length=3)
+    evidence_fact_ids: list[str] = Field(max_length=12)
+    check_ids: list[str] = Field(max_length=3)
+    action_ids: list[str] = Field(max_length=3)
 
 
 class Insight(BaseModel):

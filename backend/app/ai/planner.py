@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 from typing import Protocol, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from .client import LLMClientError, OpenAIStructuredClient
 from .models import PlannerDecision, PlannerResult
+from .question_policy import inspect_question, plan_mismatch
 from .prompts import PLANNER_INSTRUCTIONS
 
 
@@ -46,13 +48,17 @@ def create_analysis_plan(
             reason="질문은 300자 이하여야 합니다.",
         )
 
+    requirements = inspect_question(normalized)
+    if requirements.reason:
+        return PlannerResult(status="unsupported_question", reason=requirements.reason)
     generator = llm or OpenAIStructuredClient()
 
     try:
         decision = generator.generate_structured(
             schema=PlannerDecision,
             instructions=PLANNER_INSTRUCTIONS,
-            input_text=normalized,
+            input_text=json.dumps({"question": normalized,
+                                   "explicit_conditions": requirements.expected}, ensure_ascii=False),
             max_output_tokens=500,
         )
     except LLMClientError as exc:
@@ -61,11 +67,21 @@ def create_analysis_plan(
             reason=exc.code,
         )
 
-    if decision.status == "unsupported_question":
+    try:
+        decision = PlannerDecision.model_validate(
+            decision.model_dump() if isinstance(decision, BaseModel) else decision)
+    except (ValidationError, TypeError, ValueError):
+        return PlannerResult(status="llm_error", reason="invalid_structured_output")
+
+    if decision.status == "unsupported_question" or decision.unrepresented_constraints:
         return PlannerResult(
             status="unsupported_question",
-            reason=decision.reason or "지원하지 않는 분석 질문입니다.",
+            reason="질문의 조건을 현재 분석 계획에 모두 반영할 수 없습니다. 지원하는 지표 하나를 플랫폼별·상품별·월별로 질문해 주세요.",
         )
+
+    mismatch = plan_mismatch(requirements, decision.plan)
+    if mismatch:
+        return PlannerResult(status="unsupported_question", reason=mismatch)
 
     return PlannerResult(
         status="ok",
