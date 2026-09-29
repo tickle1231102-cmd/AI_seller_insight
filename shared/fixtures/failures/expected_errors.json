@@ -1,0 +1,21 @@
+{
+  "_note": "실패용 fixture와 기대 오류. 오류 형식은 TECH_SPEC 7-1, 코드 정의는 TECH_SPEC 4-2·7-1 기준.",
+  "coupang_2026-09_empty.csv": {
+    "code": "EMPTY_FILE",
+    "http": 422
+  },
+  "coupang_2026-09_missing_columns.csv": {
+    "code": "MISSING_COLUMNS",
+    "http": 422,
+    "details": { "file": "coupang_2026-09_missing_columns.csv", "missing": ["광고매출"] }
+  },
+  "coupang_2026-09_invalid_number.csv": {
+    "code": "INVALID_NUMBER",
+    "http": 422,
+    "details": { "file": "coupang_2026-09_invalid_number.csv", "row": 2, "column": "총매출", "value": "abc" }
+  },
+  "unknown_platform_2026-09.csv": {
+    "code": "UNKNOWN_PLATFORM",
+    "http": 422
+  }
+}

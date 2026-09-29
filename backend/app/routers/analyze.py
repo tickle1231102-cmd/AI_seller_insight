@@ -1,0 +1,92 @@
+"""POST /api/analyze — TECH_SPEC 1장 처리 흐름 1~9단계.
+
+C(analysis)·D(ai) 모듈을 순서대로 호출해 응답을 조립한다.
+AI 단계(7·8)가 어떤 이유로 실패해도 1~6단계 결과(kpis, comparison, rows, signals)는 정상 반환한다.
+"""
+
+import importlib
+import logging
+from typing import Any
+
+from fastapi import APIRouter, File, Form, UploadFile
+from fastapi.concurrency import run_in_threadpool
+
+from app.analysis import compare, kpi, normalize, signals
+from app.core.errors import AppError
+from app.core.uploads import UploadedFile, read_uploads
+from app.schemas import AnalyzeResponse, ErrorResponse, Insight
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/api")
+
+MAX_QUESTION_LENGTH = 300
+
+
+def _load_ai():
+    """D 의 ai 패키지. 아직 없거나 import 에 실패하면 예외 → llm_error 로 처리된다."""
+    return importlib.import_module("app.ai")
+
+
+def _dump(value: Any) -> Any:
+    return value.model_dump() if hasattr(value, "model_dump") else value
+
+
+def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | None) -> Insight:
+    """TECH_SPEC 1장 7·8단계. 예외를 밖으로 내보내지 않는다."""
+    try:
+        ai = _load_ai()
+        plan, answer = None, None
+
+        if question:
+            plan_result = ai.create_analysis_plan(question)  # D
+            if plan_result.status == "unsupported_question":
+                return Insight(status="unsupported_question", summary=plan_result.reason or "")
+            if plan_result.status != "ok":
+                logger.warning("planner failed: %s", plan_result.reason)
+                return Insight(status="llm_error")
+            plan = plan_result.plan
+            answer = compare.run_plan(df, plan)  # C
+
+        result = ai.create_insight(kpis, comparison, sigs, plan=plan, answer=answer)  # D
+        insight = Insight.model_validate(_dump(result))
+        if plan is not None:
+            insight.plan = _dump(plan)
+            insight.answer = answer
+        return insight
+    except Exception:
+        logger.exception("AI step failed")
+        return Insight(status="llm_error")
+
+
+def _analyze(uploads: list[UploadedFile], question: str | None) -> AnalyzeResponse:
+    df = normalize.normalize_files([(u.filename, u.content) for u in uploads])  # 2·3
+    kpis = kpi.compute_kpis(df)  # 4
+    comparison = compare.build_comparison(df)  # 5
+    sigs = signals.detect_signals(kpis, comparison)  # 6
+    insight = _run_ai(df, kpis, comparison, sigs, question)  # 7·8
+    return AnalyzeResponse(  # 9
+        kpis=kpis,
+        comparison=comparison,
+        rows=df.to_dict(orient="records"),
+        signals=sigs,
+        insight=insight,
+    )
+
+
+@router.post(
+    "/analyze",
+    response_model=AnalyzeResponse,
+    responses={400: {"model": ErrorResponse}, 413: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
+)
+async def analyze(files: list[UploadFile] | None = File(None), question: str | None = Form(None)):
+    question = (question or "").strip() or None
+    if question and len(question) > MAX_QUESTION_LENGTH:
+        raise AppError(
+            "QUESTION_TOO_LONG",
+            f"질문은 {MAX_QUESTION_LENGTH}자 이내로 입력해주세요.",
+            400,
+            {"max_length": MAX_QUESTION_LENGTH, "length": len(question)},
+        )
+    uploads = await read_uploads(files)  # 1
+    # pandas 계산·LLM 호출은 블로킹이라 스레드풀에서 실행해 서버가 멈추지 않게 한다.
+    return await run_in_threadpool(_analyze, uploads, question)
