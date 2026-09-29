@@ -89,7 +89,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 │  │  │  └─ signals.py
 │  │  └─ ai/                      ← D
 │  │     ├─ client.py             # OpenAI 호출 · 타임아웃 · 재시도
-│  │     ├─ models.py             # AnalysisPlan, PlannerResult, InsightDraft(LLM 생성용), Insight(응답용)
+│  │     ├─ models.py             # AnalysisPlan, PlannerResult, InsightSelection(LLM 선택용), Insight(응답용)
 │  │     ├─ planner.py
 │  │     ├─ insight.py
 │  │     └─ prompts/
@@ -310,7 +310,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | `ok` | 정상 | 전체 표시 |
 | `unsupported_question` | 질문을 분석 계획으로 변환 불가 | 안내 문구 + 질문 예시 표시 |
 | `llm_error` | LLM 호출 실패/타임아웃/JSON 검증 실패, API 키 없음, 계획 실행(`run_plan`) 중 예상 못 한 오류 | KPI는 표시, AI 영역에 재시도 안내 |
-| `skipped` | 예약된 값. 현재 서버는 **반환하지 않음** (질문이 없어도 인사이트를 생성하고, LLM 이 정할 수 있는 `status` 는 `InsightDraft` 의 `ok`·`unsupported_question` 뿐 — 8-2 참고) | AI 영역 숨김 |
+| `skipped` | 예약된 값. 현재 서버는 **반환하지 않음** (질문이 없어도 인사이트를 생성하며, 인사이트 LLM은 상태가 아닌 근거 ID만 선택 — 8-2 참고) | AI 영역 숨김 |
 
 - 질문이 없으면 계획(`plan`)·답(`answer`) 없이 KPI 요약 인사이트를 만든다.
 - `unsupported_question` 이면 `summary` 에 사용자에게 보여 줄 이유가 담긴다 (예: 데이터에 없는 월을 물으면 업로드된 기간 안내).
@@ -331,20 +331,18 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 
 - Pydantic 모델 `AnalysisPlan` 으로 검증, 허용되지 않은 값은 `unsupported_question`
 - LLM은 계획만 만들고, 실행은 `analysis/compare.run_plan(df, plan)` 이 수행
+- 질문의 명시적 지표·분류·정렬·개수·연월과 생성 계획을 대조한다. 현재 계약으로 표현할 수 없는 조건은 생략하거나 임의 축소하지 않고 `unsupported_question`으로 안내한다. 모델의 내부 `unrepresented_constraints`도 확인하며 공개 `AnalysisPlan` 계약은 변경하지 않는다.
 
 ### 8-2. Insight — 계산 결과 → 설명
 
 - 입력: `kpis`, `comparison`, `signals`, (선택) `plan` + `answer`
 - 출력: `summary`, `evidence`, `checks`, `actions`, `limitations` (Pydantic `Insight` 로 검증)
-- LLM 은 `InsightDraft`(`status`, `summary`, `evidence`, `checks`, `actions`, `limitations`, `reason`)만 생성한다. `status` 는 `ok` / `unsupported_question` 만 허용된다.
-- `plan`·`answer` 는 LLM 이 만들지 않고, 서버가 위에서 계산한 값을 붙여 최종 `Insight` 를 만든다 (LLM 이 계산 결과를 바꾸지 못하게 하기 위함).
-- LLM 호출이 실패하면 `Insight(status="llm_error")` 를 반환한다.
-- 프롬프트 규칙:
-  1. 입력에 있는 숫자만 사용, 숫자 재계산·변경 금지
-  2. 입력 데이터에 없는 요인(광고 소재, CTR, CPC, CVR, 경쟁사 가격, 시장 상황)을 원인으로 단정 금지 → `limitations` 에 "확인 불가 + 필요한 추가 데이터"로 기술
-  3. 원인은 "후보"로 표현
-  4. 한국어, 간결한 문장
-- 후처리 검증: `evidence` 의 숫자가 입력 KPI 값과 일치하는지 확인, 불일치 시 해당 항목 제거
+- 서버가 계산 결과 경로·기간·대상·지표·값·단위를 근거 목록으로 구성한다. LLM은 `InsightSelection`의 `summary_fact_ids`, `evidence_fact_ids`, `check_ids`, `action_ids`만 선택한다. 최종 문장은 서버가 생성하며 숫자를 재계산하지 않는다.
+- `status`·`reason`은 서버가 결정하고 `plan`·`answer`는 호출자가 제공한 계산 결과만 유지한다. LLM의 자유 문장이나 응답 메타데이터는 사용하지 않는다. `InsightDraft`/`InsightContent`는 호환 타입으로 남지만 현재 생성 경로에서는 사용하지 않는다.
+- 요약에 없는 근거 ID, 허용하지 않은 점검·행동 ID 또는 LLM 호출/검증 실패는 `llm_error`로 처리한다. 잘못된 `evidence_fact_ids`는 해당 항목만 제거한다. KPI와 호출자의 계산 결과는 보존한다.
+- 같은 기간·대상·지표의 계산 결과가 서로 다르면 API 호출 전 `llm_error`, 질문의 계산 가능한 답이 없으면 `unsupported_question`으로 처리한다. 유효한 0과 결측값은 구분한다.
+- 점검·행동은 입력 데이터와 신호가 허용하는 문구만 사용한다. 업로드 데이터에 없는 원인을 단정하지 않고, 비교 기간 부재·계산 불가 ROAS·불연속 월·추가로 필요한 자료를 서버가 `limitations`에 안내한다.
+- 근거는 현재 계산 결과 경로를 가리키며 원본 엑셀 셀 추적을 의미하지 않는다. 잘못 계산된 입력을 전부 검산하거나 모든 자연어 조건을 완전히 이해한다고 보장하지 않는다. 평가 범위는 `AI_RELIABILITY_IMPROVEMENTS.md` 참고.
 
 ### 8-3. 실패 처리
 
