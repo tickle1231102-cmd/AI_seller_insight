@@ -9,6 +9,9 @@ export const formatPercent = (v: number | null) => (v === null ? "-" : `${v.toFi
 export const formatSignedPercent = (v: number | null, unit = "%") =>
   v === null ? "-" : `${v > 0 ? "+" : ""}${v.toFixed(1)}${unit}`;
 
+export const formatBytes = (b: number) =>
+  b < 1024 ? `${b}B` : b < 1024 * 1024 ? `${(b / 1024).toFixed(1)}KB` : `${(b / 1024 / 1024).toFixed(1)}MB`;
+
 export const PLATFORM_LABEL: Record<Platform, string> = {
   coupang: "쿠팡",
   naver: "네이버",

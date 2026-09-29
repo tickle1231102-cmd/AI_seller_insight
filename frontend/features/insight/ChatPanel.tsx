@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Insight } from "@/types/api";
 import { MAX_QUESTION_LENGTH } from "@/lib/api/client";
-import { InsightBody } from "./InsightBody";
+import { EXAMPLE_QUESTIONS, InsightBody } from "./InsightBody";
 
 export type ChatMessage =
   | { id: number; role: "user"; text: string }
@@ -76,6 +76,16 @@ export function ChatPanel({ messages, pending, disabled, onSend, onReset }: Prop
           </div>
         )}
       </div>
+
+      {!disabled && (
+        <div className="examples">
+          {EXAMPLE_QUESTIONS.map((q) => (
+            <button key={q} className="chip-btn" onClick={() => onSend(q)} disabled={pending}>
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
 
       <form
         className="chat-input"

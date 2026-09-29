@@ -230,6 +230,19 @@ td { padding: 10px; border-top: 1px solid var(--border); white-space: nowrap; }
 .typing span:nth-child(3) { animation-delay: 0.4s; }
 @keyframes blink { 0%, 80%, 100% { opacity: 0.3; } 40% { opacity: 1; } }
 
+.examples { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 20px 14px; }
+.chip-btn {
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+.chip-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.answer { background: var(--card); border-radius: 8px; }
+.answer td, .answer th { padding: 6px 10px; font-size: 12px; }
+
 .chat-input {
   display: flex;
   align-items: center;

@@ -57,8 +57,10 @@ function mockInsight(question?: string): Insight {
   };
 }
 
-export async function mockAnalyze(_files: File[], question?: string): Promise<AnalyzeResponse> {
+export async function mockAnalyze(files: File[], question?: string): Promise<AnalyzeResponse> {
   await delay(900);
+  const periods = new Set(files.map((f) => guessPeriod(f.name)));
+  if (periods.size === 1) return singlePeriod([...periods][0], question);
   return {
     kpis: {
       period: "2026-09",
@@ -90,6 +92,36 @@ export async function mockAnalyze(_files: File[], question?: string): Promise<An
       { signal: "ROAS_DOWN_WITH_SPEND_GROWTH", platform: "all", ad_spend_change: 28.0, ad_revenue_change: 22.4, roas_change_pp: -14.2 },
       { signal: "LOW_ROAS_PLATFORM", platform: "coupang", roas: 291.7, overall_roas: 312.5 },
     ],
+    insight: mockInsight(question),
+  };
+}
+
+function singlePeriod(period: string, question?: string): AnalyzeResponse {
+  const current = { revenue: 12600000, orders: 830, units: 1020, ad_spend: 1920000, ad_revenue: 6000000, roas: 312.5 };
+  return {
+    kpis: {
+      period,
+      previous_period: null,
+      current,
+      previous: null,
+      change: {
+        revenue_change: null,
+        orders_change: null,
+        units_change: null,
+        ad_spend_change: null,
+        ad_revenue_change: null,
+        roas_change_pp: null,
+      },
+    },
+    comparison: {
+      by_platform: [
+        { platform: "coupang", revenue: 8000000, orders: 520, ad_spend: 1200000, ad_revenue: 3500000, roas: 291.7 },
+        { platform: "naver", revenue: 4600000, orders: 310, ad_spend: 720000, ad_revenue: 2500000, roas: 347.2 },
+      ],
+      trend: [{ period, revenue: current.revenue, roas: current.roas }],
+    },
+    rows: [],
+    signals: [],
     insight: mockInsight(question),
   };
 }

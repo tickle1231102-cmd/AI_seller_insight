@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { PreviewFile } from "@/types/api";
-import { platformLabel } from "@/lib/format";
+import { formatBytes, platformLabel } from "@/lib/format";
 
 interface Props {
   files: File[];
@@ -66,6 +66,7 @@ export function UploadPanel({ files, previews, busy, onFilesChange, onAnalyze }:
               return (
                 <li key={f.name}>
                   <span className="file-name">{f.name}</span>
+                  <span className="muted small">{formatBytes(f.size)}</span>
                   {p ? (
                     <span className="muted">
                       {platformLabel(p.platform)} · {p.periods.join(", ")} · {p.row_count}행

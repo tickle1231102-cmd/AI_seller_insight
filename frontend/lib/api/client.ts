@@ -15,6 +15,24 @@ export class ApiRequestError extends Error {
   }
 }
 
+const MESSAGES: Record<string, (d?: Record<string, unknown>) => string> = {
+  NO_FILES: () => "업로드할 파일을 선택해주세요.",
+  TOO_MANY_FILES: () => `파일은 최대 ${MAX_FILES}개까지 업로드할 수 있습니다.`,
+  FILE_TOO_LARGE: (d) => `${d?.file ? `${d.file}: ` : ""}파일 크기는 5MB 이하여야 합니다.`,
+  UNSUPPORTED_FILE_TYPE: (d) => `${d?.file ? `${d.file}: ` : ""}.xlsx 또는 .csv 파일만 업로드할 수 있습니다.`,
+  EMPTY_FILE: (d) => `${d?.file ? `${d.file}: ` : ""}데이터가 없는 파일입니다.`,
+  MISSING_COLUMNS: (d) =>
+    `${d?.file ? `${d.file}: ` : ""}필수 컬럼이 없습니다${Array.isArray(d?.missing) ? ` (${d.missing.join(", ")})` : ""}.`,
+  INVALID_NUMBER: (d) =>
+    `${d?.file ? `${d.file}: ` : ""}숫자로 읽을 수 없는 값이 있습니다${d?.row ? ` (${d.row}행${d?.column ? ` · ${d.column}` : ""})` : ""}.`,
+  UNKNOWN_PLATFORM: (d) => `${d?.file ? `${d.file}: ` : ""}쿠팡·네이버 리포트 형식이 아닙니다.`,
+  QUESTION_TOO_LONG: () => `질문은 ${MAX_QUESTION_LENGTH}자 이내로 입력해주세요.`,
+  INTERNAL_ERROR: () => "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+};
+
+export const messageFor = (code: string, fallback: string, details?: Record<string, unknown>) =>
+  MESSAGES[code]?.(details) ?? fallback;
+
 async function postForm<T>(path: string, form: FormData): Promise<T> {
   let res: Response;
   try {
@@ -25,7 +43,8 @@ async function postForm<T>(path: string, form: FormData): Promise<T> {
   const body = await res.json().catch(() => null);
   if (!res.ok) {
     const err = (body as ApiError | null)?.error;
-    throw new ApiRequestError(err?.code ?? "INTERNAL_ERROR", err?.message ?? "알 수 없는 오류가 발생했습니다.", err?.details);
+    const code = err?.code ?? "INTERNAL_ERROR";
+    throw new ApiRequestError(code, messageFor(code, err?.message ?? "알 수 없는 오류가 발생했습니다.", err?.details), err?.details);
   }
   return body as T;
 }
