@@ -63,6 +63,23 @@ class PlannerResult(BaseModel):
         return self
 
 
+class InsightDraft(BaseModel):
+    """Structured output requested from the LLM for the insight explanation.
+
+    plan/answer are computed upstream and attached afterwards, so they are
+    kept out of this schema (free-form dicts are rejected by strict
+    structured outputs).
+    """
+
+    status: Literal["ok", "unsupported_question"]
+    summary: str = ""
+    evidence: list[str] = Field(default_factory=list)
+    checks: list[str] = Field(default_factory=list)
+    actions: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+    reason: str | None = None
+
+
 class Insight(BaseModel):
     """Safe, display-ready explanation of deterministic analysis results."""
 
