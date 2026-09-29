@@ -5,7 +5,7 @@
       "platform": "coupang",
       "periods": ["2026-09"],
       "row_count": 42,
-      "columns": ["총매출", "주문", "판매량", "광고비", "광고매출"],
+      "columns": ["product_name", "총매출", "주문", "판매량", "광고비", "광고매출"],
       "preview": [{ "product_name": "샘플 상품", "총매출": 120000 }]
     }
   ]

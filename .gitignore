@@ -1,11 +1,12 @@
 # env
 .env
-.env.local
+.env.*
+!.env.example
 
 # python
 .venv/
 __pycache__/
-*.pyc
+*.py[cod]
 .pytest_cache/
 
 # node
