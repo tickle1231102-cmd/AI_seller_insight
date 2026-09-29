@@ -14,6 +14,10 @@ from app.main import app
 
 FIXTURES = Path(__file__).resolve().parents[2] / "shared" / "fixtures"
 EXPECTED = {k: v for k, v in json.loads((FIXTURES / "expected_kpis.json").read_text(encoding="utf-8")).items() if k != "_note"}
+FAILURES = FIXTURES / "failures"
+EXPECTED_ERRORS = {
+    k: v for k, v in json.loads((FAILURES / "expected_errors.json").read_text(encoding="utf-8")).items() if not k.startswith("_")
+}
 NORMAL_FILES = ["naver_2026-09.csv", "coupang_2026-08.csv", "naver_2026-08.csv", "coupang_2026-09.csv"]  # 일부러 뒤섞은 순서
 client = TestClient(app, raise_server_exceptions=False)
 
@@ -57,6 +61,41 @@ def test_normalize_files_uses_plain_python_types(df):
         assert type(row["period"]) is str and type(row["product_id"]) is str
 
 
+def test_normalize_files_schema_and_dtypes(df):
+    """공통 스키마 9개 필드가 정해진 순서로 있고, 문자열·정수 타입이 맞으며 빈 값(NaN)이 없다."""
+    assert list(df.columns) == ["period", "platform", "product_id", "product_name", "revenue", "orders", "units", "ad_spend", "ad_revenue"]
+    for column in ("period", "platform", "product_id", "product_name"):
+        assert pd.api.types.is_string_dtype(df[column]), column
+    for column in ("revenue", "orders", "units", "ad_spend", "ad_revenue"):
+        assert pd.api.types.is_integer_dtype(df[column]), column
+    assert not df.isna().any().any()
+    assert set(df["platform"]) == {"coupang", "naver"}
+
+
+@pytest.mark.parametrize("name", sorted(NORMAL_FILES))
+def test_normalize_files_each_normal_fixture(name):
+    """정상 fixture 4종을 파일 하나씩 정규화해도 expected_kpis.json 의 해당 rows 와 같다."""
+    platform, period = name.removesuffix(".csv").split("_")
+    result = normalize.normalize_files([(name, (FIXTURES / name).read_bytes())])
+    expected = [r for r in EXPECTED["rows"] if r["platform"] == platform and r["period"] == period]
+    assert len(expected) == 3
+    assert result.to_dict("records") == expected
+
+
+@pytest.mark.parametrize("name", sorted(EXPECTED_ERRORS))
+def test_normalize_files_each_failure_fixture(name):
+    """실패 fixture 4종이 expected_errors.json 의 코드·HTTP 상태·details 로 실패한다."""
+    expected = EXPECTED_ERRORS[name]
+    with pytest.raises(AppError) as exc:
+        normalize.normalize_files([(name, (FAILURES / name).read_bytes())])
+    assert exc.value.code == expected["code"]
+    assert exc.value.status_code == expected["http"]
+    assert exc.value.message
+    assert exc.value.details["file"] == name
+    for key, value in expected.get("details", {}).items():
+        assert exc.value.details[key] == value
+
+
 def test_normalize_files_rounds_money_to_int():
     df = normalize.normalize_files([("coupang_2026-09.csv", csv_bytes("P001,이어폰,1000.6,3,4,200.4,500.5"))])
     row = df.to_dict("records")[0]
@@ -96,6 +135,32 @@ def test_build_comparison_matches_expected(df):
 def test_detect_signals_matches_expected(df):
     k = kpi.compute_kpis(df)
     assert signals.detect_signals(k, compare.build_comparison(df)) == EXPECTED["signals"]
+
+
+def test_totals_aggregate_by_period_and_platform(df):
+    """기간·플랫폼 단위 집계가 정답 rows 를 따로 합산한 값과 같다 (ROAS 는 합계로 재계산)."""
+    for (period, platform), group in df.groupby(["period", "platform"]):
+        rows = [r for r in EXPECTED["rows"] if r["period"] == period and r["platform"] == platform]
+        got = kpi.totals(group)
+        for field in ("revenue", "orders", "units", "ad_spend", "ad_revenue"):
+            assert got[field] == sum(r[field] for r in rows), (period, platform, field)
+        assert got["roas"] == round(sum(r["ad_revenue"] for r in rows) / sum(r["ad_spend"] for r in rows) * 100, 1)
+
+
+def analyze_all(files):
+    """analyze 라우터가 하는 2~6단계를 그대로 실행한 결과 전체."""
+    frame = normalize.normalize_files(files)
+    k = kpi.compute_kpis(frame)
+    c = compare.build_comparison(frame)
+    return {"rows": frame.to_dict("records"), "kpis": k, "comparison": c, "signals": signals.detect_signals(k, c)}
+
+
+def test_repeated_runs_and_input_order_give_identical_results():
+    files = [(n, (FIXTURES / n).read_bytes()) for n in NORMAL_FILES]
+    first = analyze_all(files)
+    assert analyze_all(files) == first
+    assert analyze_all(list(reversed(files))) == first
+    assert json.dumps(analyze_all(files), sort_keys=True) == json.dumps(first, sort_keys=True)
 
 
 # ---- kpi 경계 ----
