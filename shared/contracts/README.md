@@ -57,6 +57,9 @@
 | `INVALID_NUMBER` | 422 | `file`, `row`, `column` |
 | `UNKNOWN_PLATFORM` | 422 | `file` |
 | `QUESTION_TOO_LONG` | 400 | `max_length` |
+| `NOT_FOUND` | 404 | — (없는 주소) |
+| `METHOD_NOT_ALLOWED` | 405 | — (잘못된 요청 방식) |
+| `INVALID_REQUEST` | 422 | `errors`: `[{field, message}]` (요청 형식 오류) |
 | `INTERNAL_ERROR` | 500 | — |
 
 `details` 키 이름은 `frontend/lib/api/client.ts` 의 오류 메시지 함수가 사용한다 (`file`, `missing`, `row`, `column`).
