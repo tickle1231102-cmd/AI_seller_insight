@@ -63,6 +63,16 @@ class PlannerResult(BaseModel):
         return self
 
 
+class InsightContent(BaseModel):
+    """Text-only LLM output; response metadata belongs to the caller."""
+
+    summary: str
+    evidence: list[str]
+    checks: list[str]
+    actions: list[str]
+    limitations: list[str]
+
+
 class Insight(BaseModel):
     """Safe, display-ready explanation of deterministic analysis results."""
 

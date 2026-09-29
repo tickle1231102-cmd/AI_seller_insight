@@ -2,19 +2,22 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+from pydantic import BaseModel
+
 from backend.app.ai.client import LLMClientError
 from backend.app.ai.insight import create_insight
-from backend.app.ai.models import AnalysisPlan, Insight
+from backend.app.ai.models import AnalysisPlan, Insight, InsightContent
 from backend.app.ai.prompts import INSIGHT_INSTRUCTIONS
 
 
 class FakeInsightLLM:
-    def __init__(self, result: Insight | None = None, error: Exception | None = None):
+    def __init__(self, result: Any = None, error: Exception | None = None):
         self.result = result
         self.error = error
         self.kwargs: dict[str, Any] | None = None
 
-    def generate_structured(self, **kwargs: Any) -> Insight:
+    def generate_structured(self, **kwargs: Any) -> BaseModel:
         self.kwargs = kwargs
         if self.error is not None:
             raise self.error
@@ -59,7 +62,7 @@ def test_insight_contract_and_evidence_postprocessing():
     assert result.answer == answer
     assert result.evidence == ["광고비 +28.0%", "광고매출 +22.4%", "ROAS -14.2%p"]
     assert llm.kwargs is not None
-    assert llm.kwargs["schema"] is Insight
+    assert llm.kwargs["schema"] is InsightContent
     assert '"ad_spend_change": 28.0' in llm.kwargs["input_text"]
 
 
