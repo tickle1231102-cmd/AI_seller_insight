@@ -135,3 +135,25 @@ def test_internal_error_keeps_cors_header(monkeypatch):
     res = client.post("/api/preview", files=[csv_file()], headers={"Origin": "http://localhost:3000"})
     assert res.status_code == 500
     assert res.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
+# ---- TECH_SPEC 7-1 오류 코드 중 API 테스트가 없던 것 (WU-BE-05) ----
+def test_invalid_period_from_real_normalize():
+    # 가짜 없이 C 의 normalize 를 그대로 태운다. 파일명에 YYYY-MM 이 없으면 INVALID_PERIOD.
+    body = "상품ID,상품명,총매출,주문,판매량,광고비,광고매출\nP001,이어폰,1000,1,1,100,300\n".encode("utf-8")
+    err = assert_error(client.post("/api/preview", files=[csv_file("coupang.csv", body)]), 422, "INVALID_PERIOD")
+    assert err["details"]["file"] == "coupang.csv"
+
+
+def test_other_http_errors_use_http_error_code():
+    # 404·405 외의 프레임워크 HTTP 오류는 HTTP_ERROR 로, 원래 상태 코드를 유지한다.
+    from fastapi import HTTPException
+
+    def teapot():
+        raise HTTPException(status_code=418)
+
+    app.add_api_route("/__test_teapot", teapot, methods=["GET"])
+    try:
+        assert_error(client.get("/__test_teapot"), 418, "HTTP_ERROR")
+    finally:
+        app.router.routes[:] = [r for r in app.router.routes if getattr(r, "path", None) != "/__test_teapot"]
