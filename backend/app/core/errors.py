@@ -52,8 +52,15 @@ def register_error_handlers(app: FastAPI) -> None:
         errors = [{"field": ".".join(str(p) for p in e.get("loc", ())), "message": e.get("msg", "")} for e in exc.errors()]
         return _error_response(422, "INVALID_REQUEST", "요청 형식이 올바르지 않습니다.", {"errors": errors})
 
-    @app.exception_handler(Exception)
-    async def handle_unexpected(_: Request, exc: Exception):
-        # 스택트레이스는 로그에만 남기고 응답에는 노출하지 않는다.
-        logger.exception("Unhandled error: %s", exc)
-        return _error_response(500, "INTERNAL_ERROR", "서버 오류가 발생했습니다.")
+    # 예상 못 한 오류는 exception_handler(Exception) 대신 미들웨어로 잡는다.
+    # exception_handler(Exception) 는 CORS 미들웨어 바깥에서 실행돼 500 응답에 CORS 헤더가 빠지고,
+    # 브라우저가 응답을 막아 프론트에는 "서버에 연결할 수 없습니다"로 보이기 때문이다.
+    # main.py 에서 이 함수를 CORS 미들웨어 등록보다 먼저 호출해야 CORS 가 가장 바깥에 온다.
+    @app.middleware("http")
+    async def catch_unexpected(request: Request, call_next):
+        try:
+            return await call_next(request)
+        except Exception as exc:
+            # 스택트레이스는 로그에만 남기고 응답에는 노출하지 않는다.
+            logger.exception("Unhandled error: %s", exc)
+            return _error_response(500, "INTERNAL_ERROR", "서버 오류가 발생했습니다.")

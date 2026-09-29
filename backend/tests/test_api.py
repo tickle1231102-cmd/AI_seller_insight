@@ -124,3 +124,14 @@ def test_money_serialized_as_int_and_summary_not_null():
     assert out["kpis"]["current"]["revenue"] == 12600000
     assert isinstance(out["kpis"]["current"]["revenue"], int)
     assert out["insight"]["summary"] == ""
+
+
+def test_internal_error_keeps_cors_header(monkeypatch):
+    # 500 응답에 CORS 헤더가 없으면 브라우저가 막아서 프론트에는 "서버에 연결할 수 없습니다"로 보인다.
+    def boom(filename, content):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(normalize, "preview_file", boom)
+    res = client.post("/api/preview", files=[csv_file()], headers={"Origin": "http://localhost:3000"})
+    assert res.status_code == 500
+    assert res.headers.get("access-control-allow-origin") == "http://localhost:3000"
