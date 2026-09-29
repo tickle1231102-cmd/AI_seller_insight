@@ -62,21 +62,21 @@
 - **담당:** B · **리뷰:** A
 
 **완료 조건**
-- [ ] Collaborator 3명 초대 완료, 4명 모두 Clone 성공
-- [ ] `main` 브랜치 보호 규칙 설정 (PR 필수, 승인 1명 이상)
-- [ ] `.gitignore` 에 `.env`, `node_modules/`, `.venv/`, `__pycache__/` 포함
-- [ ] 4명 모두 Branch → PR → Review → Merge 1회 이상 경험
+- [x] Collaborator 3명 초대 완료, 4명 모두 Clone 성공
+- [ ] `main` 브랜치 보호 규칙 설정 (PR 필수, 승인 1명 이상) — ⏳ 확인 필요: `02ea3d5`(README) 가 PR 없이 main 에 들어감, 저장소 주인 설정 확인
+- [x] `.gitignore` 에 `.env`, `node_modules/`, `.venv/`, `__pycache__/` 포함
+- [ ] 4명 모두 Branch → PR → Review → Merge 1회 이상 경험 — ⏳ B(#4)·C(#3)는 승인 후 merge. A(#1)·D(#2)는 리뷰 승인 없이 merge됨
 
 ### WU-COM-03 프로젝트 뼈대 생성
 - **담당:** A (frontend), B (backend) · **리뷰:** C
 
 **완료 조건**
-- [ ] `frontend/` Next.js + TypeScript 프로젝트 생성, `npm run dev` 로 기본 화면 표시
-- [ ] `backend/` FastAPI 프로젝트 생성, `requirements.txt` 작성
-- [ ] `backend/app/{routers,core,analysis,ai}` 폴더 및 빈 모듈 생성
-- [ ] `GET /health` → `{"status":"ok"}` 응답
-- [ ] 각 앱에 `.env.example` 커밋
-- [ ] README 의 실행 방법대로 다른 팀원이 로컬 실행 성공
+- [x] `frontend/` Next.js + TypeScript 프로젝트 생성, `npm run dev` 로 기본 화면 표시
+- [x] `backend/` FastAPI 프로젝트 생성, `requirements.txt` 작성
+- [x] `backend/app/{routers,core,analysis,ai}` 폴더 및 빈 모듈 생성
+- [x] `GET /health` → `{"status":"ok"}` 응답
+- [x] 각 앱에 `.env.example` 커밋
+- [x] README 의 실행 방법대로 다른 팀원이 로컬 실행 성공
 
 ### WU-DA-01 테스트 fixture 제작
 - **담당:** C · **리뷰:** D
@@ -114,27 +114,27 @@
 - **담당:** B · **리뷰:** C
 
 **완료 조건**
-- [ ] `core/config.py` 에서 환경변수 로드 (`LLM_API_KEY`, `ALLOWED_ORIGINS`, `MAX_FILES`, `MAX_FILE_SIZE_MB`)
-- [ ] CORS 가 `ALLOWED_ORIGINS` 기반으로 설정, 로컬 프론트에서 `/health` 호출 성공
-- [ ] 라우터 분리 (`routers/health.py`, `preview.py`, `analyze.py`)
-- [ ] `/docs` (Swagger) 접근 가능
+- [x] `core/config.py` 에서 환경변수 로드 (`LLM_API_KEY`, `ALLOWED_ORIGINS`, `MAX_FILES`, `MAX_FILE_SIZE_MB`)
+- [x] CORS 가 `ALLOWED_ORIGINS` 기반으로 설정, 로컬 프론트에서 `/health` 호출 성공
+- [x] 라우터 분리 (`routers/health.py`, `preview.py`, `analyze.py`)
+- [x] `/docs` (Swagger) 접근 가능
 
 ### WU-BE-02 Pydantic 스키마
 - **담당:** B · **리뷰:** C
 
 **완료 조건**
-- [ ] `schemas.py` 에 `PreviewResponse`, `AnalyzeResponse`, `KPIs`, `Comparison`, `Row`, `Signal`, `Insight`, `ErrorResponse` 정의
-- [ ] `shared/contracts/` 의 예시 JSON 이 스키마 검증을 통과하는 테스트 존재
-- [ ] 라우터 응답에 `response_model` 적용
+- [x] `schemas.py` 에 `PreviewResponse`, `AnalyzeResponse`, `KPIs`, `Comparison`, `Row`, `Signal`, `Insight`, `ErrorResponse` 정의
+- [x] `shared/contracts/` 의 예시 JSON 이 스키마 검증을 통과하는 테스트 존재
+- [x] 라우터 응답에 `response_model` 적용 (`/api/preview`, `/api/analyze`)
 
 ### WU-BE-03 파일 업로드 검증 · `/api/preview`
 - **담당:** B · **리뷰:** C
 
 **완료 조건**
-- [ ] 파일 0개 → `NO_FILES`, 개수 초과 → `TOO_MANY_FILES`, 크기 초과 → `FILE_TOO_LARGE`, 확장자 오류 → `UNSUPPORTED_FILE_TYPE`
-- [ ] 정상 파일에 대해 파일별 `platform`, `periods`, `row_count`, `columns`, `preview`(최대 10행) 반환
-- [ ] C 의 정규화 오류(`MISSING_COLUMNS` 등)가 오류 응답 형식으로 전달
-- [ ] `tests/test_api.py` 에 위 케이스 테스트 통과
+- [x] 파일 0개 → `NO_FILES`, 개수 초과 → `TOO_MANY_FILES`, 크기 초과 → `FILE_TOO_LARGE`, 확장자 오류 → `UNSUPPORTED_FILE_TYPE`
+- [x] 정상 파일에 대해 파일별 `platform`, `periods`, `row_count`, `columns`, `preview`(최대 10행) 반환
+- [x] C 의 정규화 오류(`MISSING_COLUMNS` 등)가 오류 응답 형식으로 전달
+- [x] `tests/test_api.py` 에 위 케이스 테스트 통과
 
 ### WU-DA-02 플랫폼 데이터 정규화
 - **담당:** C · **리뷰:** D
@@ -218,11 +218,11 @@
 - **담당:** B · **리뷰:** C
 
 **완료 조건**
-- [ ] 처리 흐름(TECH_SPEC 1장 1~9단계)대로 C·D 모듈 호출
-- [ ] 응답이 `AnalyzeResponse` 스키마 검증 통과
-- [ ] `question` 없이 호출 가능, 300자 초과 시 `QUESTION_TOO_LONG`
-- [ ] LLM 실패 시에도 `kpis`/`comparison`/`rows`/`signals` 는 정상, `insight.status = "llm_error"`
-- [ ] fixture 4개 업로드 시 기대 KPI 반환 테스트 통과
+- [x] 처리 흐름(TECH_SPEC 1장 1~9단계)대로 C·D 모듈 호출
+- [x] 응답이 `AnalyzeResponse` 스키마 검증 통과
+- [x] `question` 없이 호출 가능, 300자 초과 시 `QUESTION_TOO_LONG`
+- [x] LLM 실패 시에도 `kpis`/`comparison`/`rows`/`signals` 는 정상, `insight.status = "llm_error"`
+- [x] fixture 4개 업로드 시 기대 KPI 반환 테스트 통과 (`tests/test_analysis.py::test_analyze_endpoint_returns_expected_deterministic_fields`, 배포 서버에서도 일치 확인)
 
 ### WU-FE-03 실제 API 연결
 - **담당:** A · **리뷰:** B
@@ -266,10 +266,10 @@
 - **담당:** B · **리뷰:** C
 
 **완료 조건**
-- [ ] `core/errors.py` 에 도메인 예외 → HTTP 응답 변환 핸들러
-- [ ] 모든 오류가 `{"error":{"code","message","details"}}` 형식
-- [ ] 예상치 못한 예외는 `INTERNAL_ERROR` (스택트레이스 응답 노출 금지, 서버 로그 기록)
-- [ ] TECH_SPEC 7-1 오류 코드 전체에 대한 API 테스트 통과
+- [x] `core/errors.py` 에 도메인 예외 → HTTP 응답 변환 핸들러
+- [x] 모든 오류가 `{"error":{"code","message","details"}}` 형식
+- [x] 예상치 못한 예외는 `INTERNAL_ERROR` (스택트레이스 응답 노출 금지, 서버 로그 기록)
+- [x] TECH_SPEC 7-1 오류 코드 전체에 대한 API 테스트 통과
 
 ---
 
@@ -299,12 +299,12 @@
 - **담당:** B · **리뷰:** C
 
 **완료 조건**
-- [ ] Render 에 Backend 배포, 배포 URL `/health` 정상
-- [ ] Render 환경변수(`LLM_API_KEY`, `LLM_MODEL`, `ALLOWED_ORIGINS`) 설정
-- [ ] Vercel 에 Frontend 배포, `NEXT_PUBLIC_API_BASE_URL` 이 Render URL
-- [ ] 배포된 Frontend 에서 CORS 오류 없이 `/api/analyze` 호출 성공
-- [ ] 저장소·빌드 로그·프론트 번들에 API 키 노출 없음
-- [ ] 배포 URL 을 README 에 기재
+- [x] Render 에 Backend 배포, 배포 URL `/health` 정상
+- [ ] Render 환경변수(`LLM_API_KEY`, `LLM_MODEL`, `ALLOWED_ORIGINS`) 설정 — ⏳ `ALLOWED_ORIGINS` 만 설정됨. API 키 전달 대기
+- [ ] Vercel 에 Frontend 배포, `NEXT_PUBLIC_API_BASE_URL` 이 Render URL — ⏳ Vercel 배포는 됨. 환경변수가 비어 mock 모드 (A 설정 대기)
+- [ ] 배포된 Frontend 에서 CORS 오류 없이 `/api/analyze` 호출 성공 — ⏳ 백엔드 CORS 허용 완료. 위 Vercel 설정 후 확인
+- [x] 저장소·빌드 로그·프론트 번들에 API 키 노출 없음
+- [x] 배포 URL 을 README 에 기재
 
 ### WU-INT-01 전체 통합 E2E 검증
 - **담당:** 전원 · **리뷰:** 전원
