@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.errors import register_error_handlers
-from app.routers import health, preview
+from app.routers import analyze, health, preview
 
 app = FastAPI(title="Seller Insight AI")
 
@@ -17,3 +17,4 @@ register_error_handlers(app)
 
 app.include_router(health.router)
 app.include_router(preview.router)
+app.include_router(analyze.router)

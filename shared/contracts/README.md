@@ -64,12 +64,22 @@
 
 ## 3. B ↔ C / D 호출 계약
 
-| 호출 | 위치 | 상태 |
-|---|---|---|
-| `normalize.preview_file(filename: str, content: bytes) -> dict` | `analysis/normalize.py` (C) | 시그니처만 정의, C 구현 필요 |
-| `create_analysis_plan(question: str) -> PlannerResult` | `ai/planner.py` (D) | D 브랜치 `feat/ai-planner-openai` |
-| 인사이트 생성 함수 | `ai/insight.py` (D) | **미정** — D 와 합의 필요 |
-| `/api/analyze` 용 C 함수 (정규화·KPI·비교·신호·`run_plan`) | `analysis/` (C) | **미정** — WU-BE-04 전 합의 |
+B 의 `routers/preview.py`, `routers/analyze.py` 가 아래 함수를 호출한다. C 함수는 시그니처만 정의돼 있고 본문은 C 가 구현한다.
+
+| 단계 (TECH_SPEC 1장) | 호출 | 위치 | 상태 |
+|---|---|---|---|
+| preview | `normalize.preview_file(filename: str, content: bytes) -> dict` | `analysis/normalize.py` (C) | 시그니처만 |
+| 2·3 정규화 | `normalize.normalize_files(files: list[tuple[str, bytes]]) -> DataFrame` | `analysis/normalize.py` (C) | 시그니처만 |
+| 4 KPI | `kpi.compute_kpis(df) -> dict` (응답 `kpis`) | `analysis/kpi.py` (C) | 시그니처만 |
+| 5 비교 | `compare.build_comparison(df) -> dict` (응답 `comparison`) | `analysis/compare.py` (C) | 시그니처만 |
+| 6 신호 | `signals.detect_signals(kpis, comparison) -> list[dict]` | `analysis/signals.py` (C) | 시그니처만 |
+| 7 질문 해석 | `create_analysis_plan(question: str) -> PlannerResult` | `ai/planner.py` (D) | D 브랜치 `feat/ai-planner-openai` |
+| 7 계획 실행 | `compare.run_plan(df, plan: AnalysisPlan) -> list[dict]` | `analysis/compare.py` (C) | 시그니처만 |
+| 8 인사이트 | `create_insight(kpis, comparison, signals, *, plan=None, answer=None) -> Insight` | `ai/insight.py` (D) | D 브랜치 `feat/ai-planner-openai` |
+
+- 응답 `rows` 는 B 가 정규화 DataFrame 을 `df.to_dict(orient="records")` 로 변환한다.
+- AI 단계(7·8)에서 어떤 예외가 나도 B 가 잡아 `insight.status = "llm_error"` 로 바꾸고 `kpis`/`comparison`/`rows`/`signals` 는 정상 반환한다.
+- `PlannerResult.status == "unsupported_question"` 이면 인사이트를 호출하지 않고 `insight.summary` 에 `reason` 을 담는다.
 
 ## 4. 환경변수
 
