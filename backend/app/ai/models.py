@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -61,3 +61,17 @@ class PlannerResult(BaseModel):
         if self.status != "ok" and self.plan is not None:
             raise ValueError("plan must be null for non-ok results")
         return self
+
+
+class Insight(BaseModel):
+    """Safe, display-ready explanation of deterministic analysis results."""
+
+    status: Literal["ok", "unsupported_question", "llm_error", "skipped"]
+    plan: AnalysisPlan | None = None
+    answer: list[dict[str, Any]] = Field(default_factory=list)
+    summary: str = ""
+    evidence: list[str] = Field(default_factory=list)
+    checks: list[str] = Field(default_factory=list)
+    actions: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+    reason: str | None = None
