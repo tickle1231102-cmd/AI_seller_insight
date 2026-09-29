@@ -89,7 +89,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 │  │  │  └─ signals.py
 │  │  └─ ai/                      ← D
 │  │     ├─ client.py             # OpenAI 호출 · 타임아웃 · 재시도
-│  │     ├─ models.py             # AnalysisPlan, PlannerResult, Insight
+│  │     ├─ models.py             # AnalysisPlan, PlannerResult, InsightDraft(LLM 생성용), Insight(응답용)
 │  │     ├─ planner.py
 │  │     ├─ insight.py
 │  │     └─ prompts/
@@ -217,7 +217,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | `HTTP_ERROR` | 원래 상태 코드 | 위에 없는 그 밖의 프레임워크 HTTP 오류 |
 | `INTERNAL_ERROR` | 500 | 기타 서버 오류 (스택트레이스는 응답에 노출하지 않고 서버 로그에만 기록) |
 
-- 모든 오류는 위 `{"error":{code,message,details}}` 형식이며, 500 을 포함한 모든 오류 응답에 CORS 헤더가 붙는다.
+- 모든 오류는 위 `{"error":{code,message,details}}` 형식이다. **허용된 Origin(`ALLOWED_ORIGINS`)에서 보낸 요청**에는 500 을 포함한 오류 응답에도 CORS 헤더가 붙는다. Origin 이 없거나 허용되지 않은 Origin 이면 `Access-Control-Allow-Origin` 은 붙지 않는다.
 - 오류별 `details` 키는 [`shared/contracts/README.md`](../shared/contracts/README.md) 2장 참고.
 
 ### 7-2. `GET /health`
@@ -297,7 +297,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | `ok` | 정상 | 전체 표시 |
 | `unsupported_question` | 질문을 분석 계획으로 변환 불가 | 안내 문구 + 질문 예시 표시 |
 | `llm_error` | LLM 호출 실패/타임아웃/JSON 검증 실패, API 키 없음, 계획 실행(`run_plan`) 중 예상 못 한 오류 | KPI는 표시, AI 영역에 재시도 안내 |
-| `skipped` | 예약된 값. 현재 백엔드는 보내지 않음 (질문이 없어도 인사이트를 생성) | AI 영역 숨김 |
+| `skipped` | 예약된 값. 현재 서버는 **반환하지 않음** (질문이 없어도 인사이트를 생성하고, LLM 이 정할 수 있는 `status` 는 `InsightDraft` 의 `ok`·`unsupported_question` 뿐 — 8-2 참고) | AI 영역 숨김 |
 
 - 질문이 없으면 계획(`plan`)·답(`answer`) 없이 KPI 요약 인사이트를 만든다.
 - `unsupported_question` 이면 `summary` 에 사용자에게 보여 줄 이유가 담긴다 (예: 데이터에 없는 월을 물으면 업로드된 기간 안내).
@@ -323,6 +323,9 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 
 - 입력: `kpis`, `comparison`, `signals`, (선택) `plan` + `answer`
 - 출력: `summary`, `evidence`, `checks`, `actions`, `limitations` (Pydantic `Insight` 로 검증)
+- LLM 은 `InsightDraft`(`status`, `summary`, `evidence`, `checks`, `actions`, `limitations`, `reason`)만 생성한다. `status` 는 `ok` / `unsupported_question` 만 허용된다.
+- `plan`·`answer` 는 LLM 이 만들지 않고, 서버가 위에서 계산한 값을 붙여 최종 `Insight` 를 만든다 (LLM 이 계산 결과를 바꾸지 못하게 하기 위함).
+- LLM 호출이 실패하면 `Insight(status="llm_error")` 를 반환한다.
 - 프롬프트 규칙:
   1. 입력에 있는 숫자만 사용, 숫자 재계산·변경 금지
   2. 입력 데이터에 없는 요인(광고 소재, CTR, CPC, CVR, 경쟁사 가격, 시장 상황)을 원인으로 단정 금지 → `limitations` 에 "확인 불가 + 필요한 추가 데이터"로 기술
@@ -334,7 +337,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 
 | 상황 | 처리 |
 |---|---|
-| 타임아웃 (15초) | `llm_error` |
+| 타임아웃 (`LLM_TIMEOUT_SECONDS`, 기본 30초) | `llm_error` |
 | JSON 파싱/검증 실패 | 1회 재시도 후 `llm_error` |
 | API 키 없음 | `llm_error` (서버 로그에 원인 기록) |
 
@@ -357,9 +360,9 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 
 | 변수 | 위치 | 설명 |
 |---|---|---|
-| `LLM_API_KEY` | Backend | LLM API 키 (절대 커밋 금지). 현재 `ai/client.py` 는 `OPENAI_API_KEY` 도 읽음 — 하나로 통일 예정 |
+| `LLM_API_KEY` | Backend | LLM API 키 (절대 커밋 금지). 현재 `ai/client.py` 는 `OPENAI_API_KEY` 를 **우선** 읽고, 없으면 `LLM_API_KEY` 를 읽음 — 하나로 통일 예정 |
 | `LLM_MODEL` | Backend | 사용할 모델명 |
-| `LLM_TIMEOUT_SECONDS` | Backend | LLM 호출 타임아웃, 기본 15. ⚠️ 현재 `ai/client.py` 는 15초 고정이라 이 값이 반영되지 않음 |
+| `LLM_TIMEOUT_SECONDS` | Backend | LLM 호출 1회당 타임아웃(초), 기본 30 |
 | `LLM_MODE` | Backend | `real` / `mock`. ⚠️ mock 은 아직 구현되지 않음 (키가 없으면 `llm_error`) |
 | `ALLOWED_ORIGINS` | Backend | CORS 허용 도메인 (쉼표 구분, Vercel URL 포함) |
 | `MAX_FILES` | Backend | 기본 10 |
@@ -382,7 +385,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | 대상 | URL |
 |---|---|
 | Backend (Render) | https://seller-insight-api-31fd.onrender.com (`/health`, `/docs`) |
-| Frontend (Vercel) | 확정 후 기재 |
+| Frontend (Vercel) | https://ai-seller-insight.vercel.app |
 
 **Render 설정 (실제 적용값)**
 - Region: Singapore, Instance: Free
