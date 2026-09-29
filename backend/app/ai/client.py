@@ -32,7 +32,7 @@ class OpenAIStructuredClient:
         # OPENAI_API_KEY is the preferred name. LLM_API_KEY keeps compatibility
         # with the current TECH_SPEC while B finalizes shared environment names.
         self.api_key = api_key or os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
-        self.model = model or os.getenv("LLM_MODEL") or "gpt-5-mini"
+        self.model = model or os.getenv("LLM_MODEL") or "gpt-6-luna"
         self.timeout_seconds = timeout_seconds
         self._client = client
 
