@@ -34,11 +34,13 @@
 | `units` | 판매량 | 결제상품수량 |
 | `ad_spend` | 광고비 | 광고비용 |
 | `ad_revenue` | 광고매출 | 전환매출 |
-| `period` | **미정** | **미정** |
-| `product_id` | **미정** | **미정** |
-| `product_name` | **미정** | **미정** |
+| `product_id` | 상품ID | 상품ID |
+| `product_name` | 상품명 | 상품명 |
+| `period` | 파일명의 `_YYYY-MM` | 파일명의 `_YYYY-MM` |
 
-> ⚠️ `period` / `product_id` / `product_name` 의 원본 컬럼(또는 파일명 규칙)은 TECH_SPEC 에 없다. C 가 fixture 제작 시 확정해 이 표에 채운다.
+> `period` 는 원본 컬럼이 아니라 **파일명**에서 뽑는다 (예: `coupang_2026-09.csv` → `2026-09`). 규칙은 `\d{4}-(0[1-9]|1[0-2])` 이고, 없으면 `INVALID_PERIOD` 오류.
+> 플랫폼은 파일명이 아니라 **컬럼 구조**로 판별한다 (지표 컬럼 5개 중 3개 이상 일치하는 쪽, 동률·미달이면 `UNKNOWN_PLATFORM`).
+> `preview_file` 의 `columns` 는 맨 앞이 `product_name` 이고 그 뒤가 원본 지표 컬럼명이다. 프론트 미리보기 표가 `columns` 를 행의 키로 쓰기 때문이다.
 
 ## 2. 오류 응답
 
@@ -54,7 +56,8 @@
 | `UNSUPPORTED_FILE_TYPE` | 400 | `file` |
 | `EMPTY_FILE` | 422 | `file` |
 | `MISSING_COLUMNS` | 422 | `file`, `missing` |
-| `INVALID_NUMBER` | 422 | `file`, `row`, `column` |
+| `INVALID_NUMBER` | 422 | `file`, `row`, `column`, `value` (`row` 는 헤더를 뺀 데이터 행 기준 1부터) |
+| `INVALID_PERIOD` | 422 | `file` (파일명에서 `_YYYY-MM` 을 찾지 못함) |
 | `UNKNOWN_PLATFORM` | 422 | `file` |
 | `QUESTION_TOO_LONG` | 400 | `max_length` |
 | `NOT_FOUND` | 404 | — (없는 주소) |
