@@ -80,7 +80,11 @@ B 의 `routers/preview.py`, `routers/analyze.py` 가 아래 함수를 호출한�
 | 7 계획 실행 | `compare.run_plan(df, plan: AnalysisPlan) -> list[dict]` | `analysis/compare.py` (C) | 시그니처만 |
 | 8 인사이트 | `create_insight(kpis, comparison, signals, *, plan=None, answer=None) -> Insight` | `ai/insight.py` (D) | D 브랜치 `feat/ai-planner-openai` |
 
-- 응답 `rows` 는 B 가 정규화 DataFrame 을 `df.to_dict(orient="records")` 로 변환한다.
+- 응답 `rows` 는 B 가 정규화 DataFrame 을 `df.to_dict(orient="records")` 로 변환한다. C 는 NaN 없이 Python 기본 타입으로 채운다.
+- `comparison.by_platform` 은 **최신 월 기준**이다. `trend` 는 전체 기간.
+- 그룹별 ROAS 는 행별 평균이 아니라 Σ광고매출 ÷ Σ광고비 × 100 으로 다시 계산한다.
+- `run_plan(df, plan)` 의 `plan` 은 D 의 `AnalysisPlan` 객체다. `sort=None` → desc, `period=None` → 최신 월, `group_by=None` → 전체 1행.
+- `run_plan` 이 `AppError` 를 던지면 (예: 데이터에 없는 월) `insight.status = "unsupported_question"`, `summary` 에 그 메시지를 담는다. 그 외 예외는 `llm_error` 로 표시하되 서버 로그에 `run_plan failed` 로 구분해 남긴다.
 - AI 단계(7·8)에서 어떤 예외가 나도 B 가 잡아 `insight.status = "llm_error"` 로 바꾸고 `kpis`/`comparison`/`rows`/`signals` 는 정상 반환한다.
 - `PlannerResult.status == "unsupported_question"` 이면 인사이트를 호출하지 않고 `insight.summary` 에 `reason` 을 담는다.
 

@@ -151,3 +151,34 @@ def test_normalize_error_passes_through(monkeypatch):
         "message": "데이터가 없는 파일입니다.",
         "details": {"file": "coupang_2026-09.csv"},
     }
+
+
+# ---- run_plan 오류 구분 (PR #5 리뷰 반영) ----
+def test_run_plan_app_error_becomes_unsupported(fake_analysis, monkeypatch):
+    from app.core.errors import AppError
+
+    def no_period(df, plan):
+        raise AppError("PERIOD_NOT_FOUND", "2026-07 데이터가 없습니다.", 422)
+
+    monkeypatch.setattr(compare, "run_plan", no_period)
+    ai = use_ai(monkeypatch, FakeAI())
+    res = client.post("/api/analyze", files=FILES, data={"question": "7월 매출 알려줘"})
+    assert res.status_code == 200
+    assert_analysis_ok(res.json())
+    insight = res.json()["insight"]
+    assert insight["status"] == "unsupported_question"
+    assert insight["summary"] == "2026-07 데이터가 없습니다."
+    assert ai.insight_calls == []
+
+
+def test_run_plan_bug_logged_separately(fake_analysis, monkeypatch, caplog):
+    def bug(df, plan):
+        raise KeyError("roas")
+
+    monkeypatch.setattr(compare, "run_plan", bug)
+    use_ai(monkeypatch, FakeAI())
+    res = client.post("/api/analyze", files=FILES, data={"question": "ROAS 제일 낮은 플랫폼?"})
+    assert res.status_code == 200
+    assert_analysis_ok(res.json())
+    assert res.json()["insight"]["status"] == "llm_error"
+    assert "run_plan failed" in caplog.text
