@@ -196,3 +196,37 @@ def test_real_csv_pipeline_rejects_unsafe_text_but_keeps_kpis(monkeypatch):
     assert body["insight"]["status"] == "llm_error"
     assert body["insight"]["summary"] == ""
     assert "999.9" not in response.text
+
+
+@pytest.mark.parametrize("with_question", [False, True])
+@pytest.mark.parametrize("summary, expected_status", [
+    ("9월 매출은 12,600,000원입니다.", "ok"),
+    ("2026-09 매출은 1,260만 원입니다.", "ok"),
+    ("2026년 9월 ROAS가 14.2%p 하락했습니다.", "ok"),
+    ("10월 매출은 12,600,000원입니다.", "llm_error"),
+    ("9월 매출은 1,261만 원입니다.", "llm_error"),
+])
+def test_real_csv_route_accepts_grounded_formats_and_keeps_data_on_rejection(
+    monkeypatch, with_question, summary, expected_status
+):
+    llm = FakeLLM(content(
+        summary=summary, checks=["1. 광고비를 확인하세요."],
+        actions=["2가지 확인 항목을 검토하세요."],
+    ))
+    monkeypatch.setattr(analyze_router, "_load_ai", lambda: SimpleNamespace(
+        create_analysis_plan=lambda question: PlannerResult(status="ok", plan=PLAN),
+        create_insight=partial(create_insight, llm=llm),
+    ))
+    fixtures = Path(__file__).resolve().parents[2] / "shared" / "fixtures"
+    files = [("files", (p.name, p.read_bytes(), "text/csv")) for p in sorted(fixtures.glob("*.csv"))]
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.post("/api/analyze", files=files,
+                               data={"question": "ROAS 제일 낮은 플랫폼?"} if with_question else {})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["kpis"]["current"]["revenue"] == 12600000
+    assert len(body["rows"]) == 12
+    assert body["insight"]["status"] == expected_status
+    assert body["insight"]["plan"] == (PLAN.model_dump() if with_question else None)
+    assert body["insight"]["answer"] == (ANSWER if with_question else [])
+    assert body["insight"]["summary"] == (summary if expected_status == "ok" else "")

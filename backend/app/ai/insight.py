@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Mapping, Sequence
 from typing import Any, Protocol, TypeVar
 
@@ -9,15 +8,11 @@ from pydantic import BaseModel, ValidationError
 
 from .client import LLMClientError, OpenAIStructuredClient
 from .models import AnalysisPlan, Insight, InsightContent
+from .number_grounding import NumberGrounding
 from .prompts import INSIGHT_INSTRUCTIONS
 
 
 TModel = TypeVar("TModel", bound=BaseModel)
-_NUMBER_RE = re.compile(r"[-+−]?(?:\d[\d,]*(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?")
-
-
-def _parse_number(token: str) -> float:
-    return float(token.replace(",", "").replace("−", "-"))
 
 
 class StructuredGenerator(Protocol):
@@ -29,46 +24,6 @@ class StructuredGenerator(Protocol):
         input_text: str,
         max_output_tokens: int = 600,
     ) -> TModel: ...
-
-
-def _numbers_from_value(value: Any) -> set[float]:
-    """Collect comparable numeric values from nested contract payloads."""
-
-    if isinstance(value, bool) or value is None:
-        return set()
-    if isinstance(value, (int, float)):
-        return {float(value)}
-    if isinstance(value, str):
-        numbers: set[float] = set()
-        for token in _NUMBER_RE.findall(value):
-            try:
-                numbers.add(_parse_number(token))
-            except ValueError:
-                continue
-        return numbers
-    if isinstance(value, Mapping):
-        result: set[float] = set()
-        for nested in value.values():
-            result.update(_numbers_from_value(nested))
-        return result
-    if isinstance(value, Sequence) and not isinstance(value, (bytes, bytearray)):
-        result = set()
-        for nested in value:
-            result.update(_numbers_from_value(nested))
-        return result
-    return set()
-
-
-def _text_matches_input(text: str, allowed_numbers: set[float]) -> bool:
-    """Check numeric membership, not the meaning or attribution of a claim."""
-
-    for token in _NUMBER_RE.findall(text):
-        try:
-            if _parse_number(token) not in allowed_numbers:
-                return False
-        except ValueError:
-            return False
-    return True
 
 
 def create_insight(
@@ -118,16 +73,18 @@ def create_insight(
     except (ValidationError, ValueError, TypeError):
         return Insight(status="llm_error", reason="invalid_structured_output", **caller_fields)
 
-    allowed_numbers: set[float] = set()
-    for value in (kpis, comparison, signals, answer):
-        allowed_numbers.update(_numbers_from_value(value))
+    grounding = NumberGrounding.from_results(
+        kpis, comparison, signals, answer, answer_count=len(caller_fields["answer"])
+    )
 
     # Preserve the agreed evidence-filter policy. An unsafe number in any other
     # display field rejects the explanation entirely; deterministic data stays.
-    filtered = [item for item in content.evidence if _text_matches_input(item, allowed_numbers)]
-    other_text = [content.summary, *content.checks, *content.actions, *content.limitations]
-    if not all(_text_matches_input(item, allowed_numbers) for item in other_text):
-        return Insight(status="llm_error", reason="ungrounded_insight_number", **caller_fields)
+    filtered = [item for item in content.evidence if grounding.matches(item, field_name="evidence")]
+    for field_name in ("summary", "checks", "actions", "limitations"):
+        value = getattr(content, field_name)
+        items = [value] if field_name == "summary" else value
+        if not all(grounding.matches(item, field_name=field_name) for item in items):
+            return Insight(status="llm_error", reason="ungrounded_insight_number", **caller_fields)
 
     return Insight(
         status="ok",
