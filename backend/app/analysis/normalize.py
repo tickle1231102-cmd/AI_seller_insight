@@ -31,6 +31,8 @@ PLATFORM_COLUMN_MAP: dict[str, dict[str, str]] = {
 PRODUCT_ID_COLUMN = "상품ID"
 PRODUCT_NAME_COLUMN = "상품명"
 
+NORMALIZED_COLUMNS = ["period", "platform", "product_id", "product_name", "revenue", "orders", "units", "ad_spend", "ad_revenue"]
+
 MIN_PLATFORM_MATCH = 3  # 플랫폼 지표 컬럼 5개 중 이 개수 이상 맞아야 그 플랫폼으로 본다
 PREVIEW_ROWS = 10
 
@@ -43,6 +45,7 @@ class _Parsed:
     platform: str
     period: str
     metric_columns: list[str]  # 원본 지표 컬럼명 (revenue, orders, units, ad_spend, ad_revenue 순)
+    product_ids: list[str]
     product_names: list[str]
     metrics: dict[str, list[int | float]]  # 원본 컬럼명 → 숫자로 바꾼 값
 
@@ -142,7 +145,9 @@ def _parse(filename: str, content: bytes) -> _Parsed:
                     {"file": filename, "row": row_no, "column": column, "value": record[column]},
                 ) from None
 
-    return _Parsed(platform, period, metric_columns, df[PRODUCT_NAME_COLUMN].tolist(), metrics)
+    return _Parsed(
+        platform, period, metric_columns, df[PRODUCT_ID_COLUMN].tolist(), df[PRODUCT_NAME_COLUMN].tolist(), metrics
+    )
 
 
 def preview_file(filename: str, content: bytes) -> dict:
@@ -167,9 +172,30 @@ def preview_file(filename: str, content: bytes) -> dict:
     }
 
 
-def normalize_files(files: list[tuple[str, bytes]]) -> "pd.DataFrame":
+def normalize_files(files: list[tuple[str, bytes]]) -> pd.DataFrame:
     """업로드 파일 전체 [(filename, content), ...] → 공통 스키마 9개 필드 DataFrame (TECH_SPEC 4장).
 
+    금액·수량은 int 로 반올림한다 (B 의 스키마가 정수만 받는다). 행은 기간·플랫폼·상품ID 순.
+    오류는 preview_file 과 같고, 어느 파일인지는 details.file 로 구분된다.
     routers/analyze.py 가 호출한다.
     """
-    raise NotImplementedError("C: normalize_files 구현 필요")
+    frames = []
+    for filename, content in files:
+        parsed = _parse(filename, content)
+        common = {
+            field: [int(round(v)) for v in parsed.metrics[column]]
+            for field, column in PLATFORM_COLUMN_MAP[parsed.platform].items()
+        }
+        frames.append(
+            pd.DataFrame(
+                {
+                    "period": parsed.period,
+                    "platform": parsed.platform,
+                    "product_id": parsed.product_ids,
+                    "product_name": parsed.product_names,
+                    **common,
+                }
+            )
+        )
+    df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=NORMALIZED_COLUMNS)
+    return df[NORMALIZED_COLUMNS].sort_values(["period", "platform", "product_id"], kind="stable").reset_index(drop=True)
