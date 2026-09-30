@@ -38,9 +38,14 @@ _RAW_RATES = {
 
 
 def _scope(df, base: str):
-    """스마트스토어 지표면 스마트스토어 행만 남긴다. 없으면 AppError."""
+    """지표에 맞는 행만 남긴다.
+
+    스마트스토어 지표면 스마트스토어 행만 (없으면 AppError). 그 외 지표는 routers/analyze.py 의 kpis 와 같은 규칙으로,
+    광고 리포트(쿠팡·네이버)가 함께 있으면 판매액이 겹칠 수 있는 스마트스토어 행을 뺀다.
+    """
     if base not in STORE_METRICS:
-        return df
+        core = df[df["platform"] != STORE_PLATFORM]
+        return df if core.empty else core
     store = df[df["platform"] == STORE_PLATFORM]
     if store.empty:
         raise AppError(

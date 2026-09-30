@@ -117,3 +117,38 @@ def test_store_metric_without_store_files(df):
     with pytest.raises(AppError) as exc:
         compare.run_plan(df, plan(metric="conversion_rate"))
     assert exc.value.code == "STORE_DATA_NOT_FOUND"
+
+
+def test_core_metrics_exclude_store_rows_when_ads_reports_exist(store_df):
+    """kpis 와 같은 규칙: 광고 리포트가 있으면 매출 등 기본 지표는 스마트스토어 행을 빼고 계산한다."""
+    rows = compare.run_plan(store_df, plan(metric="revenue", group_by="platform"))
+    assert [r["platform"] for r in rows] == ["coupang"]
+
+
+def test_core_metrics_use_store_rows_when_only_store(store_df):
+    only_store = store_df[store_df["platform"] == "naver_store"]
+    rows = compare.run_plan(only_store, plan(metric="revenue", group_by="platform"))
+    assert [r["platform"] for r in rows] == ["naver_store"]
+
+
+def test_api_mixed_upload_can_answer_store_metric(monkeypatch):
+    """회귀: 광고 리포트와 스마트스토어 파일을 함께 올리면 질문에서 스마트스토어 행이 빠져 STORE_DATA_NOT_FOUND 가 났다."""
+    from types import SimpleNamespace
+
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    class FakeAI:
+        def create_analysis_plan(self, question, **kwargs):
+            return SimpleNamespace(status="ok", plan={**plan(metric="refund_rate_change_pp", group_by="product", limit=1)}, reason=None)
+
+        def create_insight(self, kpis, comparison, signals, *, plan=None, answer=None):
+            return {"status": "ok", "summary": "s"}
+
+    monkeypatch.setattr("app.routers.analyze._load_ai", lambda: FakeAI())
+    paths = [*sorted(SMARTSTORE.glob("sales_*_sample.xlsx")), FIXTURES / "coupang_2026-08.csv", FIXTURES / "coupang_2026-09.csv"]
+    res = TestClient(app).post("/api/analyze", files=[("files", (p.name, p.read_bytes())) for p in paths], data={"question": "q"})
+    insight = res.json()["insight"]
+    assert insight["status"] == "ok", insight
+    assert insight["answer"][0]["product_name"] == "블루투스 스피커"

@@ -78,7 +78,8 @@ def _analyze(uploads: list[UploadedFile], question: str | None) -> AnalyzeRespon
     store = kpi.compute_store_kpis(df)  # 4-1 스마트스토어 판매 분석 (없으면 None)
     comparison = compare.build_comparison(core)  # 5
     sigs = signals.detect_signals(kpis, comparison)  # 6
-    insight = _run_ai(core, kpis, comparison, sigs, question)  # 7·8
+    # 질문은 전체 행을 넘긴다. run_plan 이 지표마다 스마트스토어 행을 쓸지 뺄지 정한다.
+    insight = _run_ai(df, kpis, comparison, sigs, question)  # 7·8
     return AnalyzeResponse(  # 9
         kpis=kpis,
         comparison=comparison,
