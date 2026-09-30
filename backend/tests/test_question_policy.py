@@ -48,3 +48,38 @@ def test_model_audit_can_reject_conditions_lexical_checks_do_not_recognize():
 def test_invalid_injected_provider_is_normalized():
     result = create_analysis_plan("매출", llm=FakeStructuredLLM(decision={"plan": "invalid"}))
     assert result.status == "llm_error" and result.reason == "invalid_structured_output"
+
+
+class MustNotCall:
+    def generate_structured(self, **kwargs):
+        raise AssertionError("Rejected constraints must not reach the model")
+
+
+@pytest.mark.parametrize("question", ["p123의 매출", "P001은 매출 얼마야?", "p123 매출"])
+def test_product_id_with_korean_particle_cannot_become_total_revenue(question):
+    result = create_analysis_plan(question, llm=MustNotCall())
+    assert result.status == "unsupported_question" and result.plan is None
+    assert "필터" in result.reason
+
+
+def test_advertising_comparison_is_not_misread_as_ad_spend():
+    question = "플랫폼별 광고 비교 ROAS"
+    requirements = inspect_question(question)
+    assert requirements.reason is None
+    assert requirements.expected["metric"] == "roas"
+    result = create_analysis_plan(question, llm=FakeStructuredLLM(
+        PlannerDecision(status="ok", plan=AnalysisPlan(metric="roas", group_by="platform"))))
+    assert result.status == "ok" and result.plan.metric == "roas"
+
+
+@pytest.mark.parametrize("question", ["3개월 매출 추이", "3 개월 매출 추이"])
+def test_duration_is_not_silently_replaced_with_top_n_or_all_months(question):
+    requirements = inspect_question(question)
+    assert requirements.reason and "기간 범위" in requirements.reason
+    assert "limit" not in requirements.expected
+    assert create_analysis_plan(question, llm=MustNotCall()).status == "unsupported_question"
+
+
+def test_real_top_n_still_preserves_count():
+    assert inspect_question("매출 높은 상품 3개").expected["limit"] == 3
+    assert inspect_question("광고비 높은 플랫폼").expected["metric"] == "ad_spend"

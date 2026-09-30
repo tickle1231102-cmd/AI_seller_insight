@@ -112,8 +112,26 @@ def test_contradictory_sources_block_before_model_without_overwriting_data():
     plan = AnalysisPlan(metric="revenue")
     answer = [{"revenue": 0}]
     result = create_insight(KPI, COMPARISON, SIGNALS, plan=plan, answer=answer, llm=MustNotCall())
-    assert result.status == "llm_error" and result.reason == "inconsistent_analysis_results"
-    assert result.answer == answer and result.plan == plan and result.summary == ""
+    assert result.status == "unsupported_question" and result.reason == "inconsistent_analysis_results"
+    assert result.answer == answer and result.plan == plan
+    assert "계산 결과가 서로 달라" in result.summary and "원자료" in result.summary
+
+
+def test_real_c_calculations_have_matching_rounding_across_sources():
+    import pandas as pd
+    from app.analysis import compare, kpi
+
+    df = pd.DataFrame([{
+        "period": "2026-09", "platform": "coupang", "product_id": "P001",
+        "product_name": "synthetic", "revenue": 100, "orders": 2, "units": 3,
+        "ad_spend": 3, "ad_revenue": 10,
+    }])
+    plan = AnalysisPlan(metric="roas")
+    catalogue = EvidenceCatalogue.build(kpi.compute_kpis(df), compare.build_comparison(df),
+                                        [], plan, compare.run_plan(df, plan))
+    assert not catalogue.conflicts
+    assert catalogue.facts["kpis.current.roas"].value == "333.3"
+    assert catalogue.facts["answer.0.roas"].value == "333.3"
 
 
 def test_equal_values_at_different_scopes_remain_distinct():
