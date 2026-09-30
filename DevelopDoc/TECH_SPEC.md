@@ -153,7 +153,8 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 - 판별: 컬럼에 `채널상품번호`, `채널상품명`, `판매금액(총)` 이 모두 있으면 스토어 판매 파일이다.
 - 매핑: `revenue`=판매금액(순), `orders`=상품결제건수, `units`=결제상품수량. `ad_spend`·`ad_revenue` 는 0. 추가 지표 `gross_revenue`(판매금액(총)), `visits`(방문수), `refund_count`, `refund_amount`, `discount_amount`(전체 할인액) 는 스토어 행에만 값이 있다 (그 외 행은 응답에서 필드 자체가 빠진다).
 - 기간: 행의 `날짜` 범위 중간이 속한 월, 없으면 파일명. 일자별 행은 월·상품별로 합친다.
-- **`kpis`·`comparison`·`signals`·질문 실행(`run_plan`)은 `naver_store` 행을 제외하고 계산**한다. `rows` 와 `store` 에만 나온다. 스토어 파일만 올리면 제외할 행이 없으므로 그 행으로 계산한다.
+- **`kpis`·`comparison`·`signals` 는 `naver_store` 행을 제외하고 계산**한다. 스토어 파일만 올리면 제외할 행이 없으므로 그 행으로 계산한다.
+- 질문 실행(`run_plan`)은 지표별로 정한다: 기본 지표와 그 증감은 광고 리포트가 있으면 `naver_store` 행을 빼고, 스마트스토어 지표(`visits`·`gross_revenue`·`aov`·`conversion_rate`·`refund_rate`·`discount_rate` 와 그 증감)는 `naver_store` 행만 쓴다 (없으면 `STORE_DATA_NOT_FOUND` → `unsupported_question`). 상세는 `shared/contracts/README.md` 3장.
 - `store` (응답 최상위, 스토어 파일이 없으면 `null`): 스토어 데이터의 최신 월·달력상 앞달 기준(앞달 자료가 없으면 `previous`/`change` 는 `null`) `current`/`previous`/`change`(퍼널·환불률·할인율·객단가), 상품별 `products`(최대 10개), `trend`.
 - 방문·검색어·고객 분석 파일은 아직 지원하지 않으며 `UNSUPPORTED_DATASET` 오류를 낸다 (P1).
 
@@ -339,7 +340,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 
 ```json
 {
-  "metric": "revenue | orders | units | ad_spend | ad_revenue | roas",
+  "metric": "revenue | orders | units | ad_spend | ad_revenue | roas | <전월 대비·스마트스토어 지표>",
   "group_by": "platform | period | product | null",
   "sort": "asc | desc | null",
   "limit": 5,
@@ -349,6 +350,8 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 
 - Pydantic 모델 `AnalysisPlan` 으로 검증, 허용되지 않은 값은 `unsupported_question`
 - LLM은 계획만 만들고, 실행은 `analysis/compare.run_plan(df, plan)` 이 수행
+- `metric` 전체 허용값(기본 6개 + 전월 대비 6개 + 스마트스토어 6개 + 스마트스토어 전월 대비 6개)은 `shared/contracts/README.md` 3장, 기준 코드는 `ai/models.py` 의 `Metric`
+- `create_analysis_plan(question, periods=...)`: B 가 업로드된 월 목록을 넘기고, planner 는 "8월"·"지난달"·"이번 달" 을 실제 `YYYY-MM` 으로 바꾼다. 업로드하지 않은 월은 최신 월로 대신 답하지 않는다
 
 ### 8-2. Insight — 계산 결과 → 설명
 
