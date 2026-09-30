@@ -5,7 +5,7 @@
 
 from typing import Any
 
-from app.analysis.kpi import STORE_SUM_FIELDS, _pct_change, _ratio, raw_roas, store_totals, totals
+from app.analysis.kpi import STORE_SUM_FIELDS, _pct_change, _ratio, previous_calendar_month, raw_roas, store_totals, totals
 from app.analysis.normalize import STORE_PLATFORM, core_rows
 from app.core.errors import AppError
 
@@ -135,11 +135,6 @@ def _change(base: str, current: dict, previous: dict) -> float | None:
     return None if cur is None or prev is None else _pct_change(cur, prev)
 
 
-def _previous_month(period: str) -> str:
-    year, month = map(int, period.split("-"))
-    return f"{year - 1}-12" if month == 1 else f"{year}-{month - 1:02d}"
-
-
 def _run_change_plan(df, plan, metric: str) -> list[dict]:
     """증감 지표 (예: ad_spend_change) — 기준 월(period, 없으면 최신 월)과 달력상 전월을 그룹별로 비교한다.
 
@@ -169,7 +164,7 @@ def _run_change_plan(df, plan, metric: str) -> list[dict]:
             {"period": period, "available": available},
         )
     # '전월' 은 직전 업로드 월이 아니라 달력상 바로 앞 달이다 (2026-09 → 2026-08, 2026-01 → 2025-12).
-    previous_period = _previous_month(period)
+    previous_period = previous_calendar_month(period)
     if previous_period not in available:
         raise AppError(
             "PREVIOUS_PERIOD_NOT_FOUND",

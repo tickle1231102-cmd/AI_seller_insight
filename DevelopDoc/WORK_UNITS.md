@@ -161,23 +161,27 @@
 ### WU-AI-01 LLM 클라이언트 · 실패 처리
 - **담당:** D · **리뷰:** A
 
+> #18 A 최종 승인/main ff214c2 병합 및 실제 main 비유료 493개 확인 후 D 서버 기능만 체크했다. #22 문서/opt-in 후속과 새 배포 UI/E2E는 별도 대기다. 실제 API 결과는 동일 AI 구현 29a90ea에서 실행한 기록이며 최신 단일 기준은 `D_WEDNESDAY_STATUS.md`다.
+
 **완료 조건**
-- [ ] `ai/` 내 LLM 호출 함수가 API 키를 환경변수로만 읽음
-- [ ] 타임아웃(15초) 적용
-- [ ] JSON 파싱/검증 실패 시 1회 재시도 후 `llm_error` 반환
-- [ ] API 키 없음·네트워크 오류 시 예외가 밖으로 새지 않고 `llm_error` 반환
-- [ ] 실패 경로를 모킹한 테스트 통과
+- [x] `ai/` 내 LLM 호출 함수가 API 키를 환경변수로만 읽음 (`OPENAI_API_KEY` 우선, `LLM_API_KEY` 호환; 실제 키는 커밋하지 않음)
+- [x] 호출 1회당 타임아웃 적용 (`LLM_TIMEOUT_SECONDS`, 기본 30초 — 최신 TECH_SPEC과 일치)
+- [x] JSON 파싱/검증 실패 시 1회 재시도 후 `llm_error` 반환 (`test_structured_client_retries_invalid_output_once`)
+- [x] API 키 없음·네트워크 오류 시 예외가 밖으로 새지 않고 `llm_error` 반환 (`test_missing_api_key_is_normalized`, `test_structured_client_normalizes_provider_failure`)
+- [x] 실패 경로를 모킹한 테스트 통과 (실제 main 493 passed/9 deselected, #22 통합 493 passed/10 deselected)
 
 ### WU-AI-02 질문 → 분석 계획 JSON (Planner)
 - **담당:** D · **리뷰:** A
 
+> #18 A 승인/main 반영 및 실제 main 회귀 확인 완료. 유료40문항은 동일 AI 구현 29a90ea의 기록이며 새 배포 UI는 별도다.
+
 **완료 조건**
-- [ ] `planner.py` 가 질문 → `AnalysisPlan` (`metric`, `group_by`, `sort`, `limit`, `period`) 반환
-- [ ] 허용 값 외 출력은 Pydantic 검증에서 걸러져 `unsupported_question`
-- [ ] 테스트 질문 세트 최소 10개 작성 (`prompts/` 또는 `tests/`)
-- [ ] 테스트 질문 세트 90% 이상 올바른 계획 생성
+- [x] `planner.py` 가 질문 → `AnalysisPlan` (`metric`, `group_by`, `sort`, `limit`, `period`) 반환
+- [x] 허용 값 외 구조 출력은 Pydantic 검증·1회 재시도 후 `llm_error`; 현재 계약에 없는 질문 조건·명시 조건 누락·임의 축소는 질문 정책과 `unrepresented_constraints`로 `unsupported_question` 안내
+- [x] 최신 테스트 질문 세트 40개 작성 (`backend/tests/ai_quality_cases.json`: 지원 26, 미지원 14)
+- [x] 실제 `gpt-6-luna` 테스트 질문 세트 40/40 통과(고정 회귀 기준, 최소 90% 이상; 일반 정확도 보장 아님)
   - 예: "광고 효율이 가장 안 좋은 플랫폼 어디야?" → `{"metric":"roas","group_by":"platform","sort":"asc"}`
-- [ ] 분석과 무관한 질문(예: "오늘 날씨")은 `unsupported_question`
+- [x] 분석과 무관하거나 현재 계약으로 정확히 표현할 수 없는 질문은 `unsupported_question`
 
 ---
 
@@ -187,9 +191,9 @@
 - **담당:** C · **리뷰:** D
 
 **완료 조건**
-- [x] `compare.py` 에서 최신 월 vs 직전 월 증감률(%) 및 ROAS 증감(%p) 계산 (실제 구현 위치는 `kpi.py::compute_kpis`, `compare.py` 는 플랫폼 비교·추이·계획 실행 담당)
+- [x] `compare.py` 에서 최신 월 vs 달력상 바로 앞달 증감률(%) 및 ROAS 증감(%p) 계산. 앞달 자료가 없으면 `previous_period`·`previous` 는 `null` 이고 `change` 는 객체로 오되 각 지표 값이 `null` (#27, 실제 구현 위치는 `kpi.py::compute_kpis`, `compare.py` 는 플랫폼 비교·추이·계획 실행 담당)
 - [x] 전월 값 0 → 증감률 `null` (`test_previous_zero_revenue_change_is_null`)
-- [x] 데이터가 한 달뿐이면 `change` 는 `null`, 오류 없이 반환 (`test_single_month_has_no_previous`)
+- [x] 데이터가 한 달뿐이면 `previous_period`·`previous` 는 `null`, `change` 의 각 지표 값이 `null` 이고 오류 없이 반환 (`test_single_month_has_no_previous`)
 - [x] `by_platform`, `trend` 생성 (`test_build_comparison_matches_expected`)
 - [x] `run_plan(df, plan)` 이 `AnalysisPlan` 을 받아 정렬·그룹·limit 적용 결과 반환 (`test_run_plan_*`, D 의 `AnalysisPlan` 모델로도 실행 확인)
 - [x] fixture 결과가 매출 +21.2%, 광고비 +28.0%, ROAS −14.2%p 로 일치 (`test_compute_kpis_matches_expected`)
@@ -208,11 +212,12 @@
 - **담당:** D · **리뷰:** A
 
 **완료 조건**
-- [ ] `insight.py` 가 `kpis`, `comparison`, `signals`, (선택) `plan`/`answer` 를 받아 `Insight` 반환
-- [ ] 출력이 `summary`, `evidence`, `checks`, `actions`, `limitations` 로 분리
-- [ ] 프롬프트에 "숫자 변경 금지", "데이터에 없는 원인 단정 금지", "원인은 후보로 표현" 규칙 포함
-- [ ] 후처리: `evidence` 숫자가 입력 KPI 와 불일치하면 제거
-- [ ] fixture 입력에 대해 "광고비 증가율이 광고매출 증가율보다 높아 ROAS 하락" 취지의 설명 생성
+> #18 A 승인/main 반영 및 실제 main 회귀 확인 완료. API 근거/단위 확인과 배포 화면 확인을 구분한다.
+- [x] `insight.py` 가 `kpis`, `comparison`, `signals`, (선택) `plan`/`answer` 를 받아 `Insight` 반환
+- [x] 출력이 `summary`, `evidence`, `checks`, `actions`, `limitations` 로 분리
+- [x] LLM은 자유 문장 대신 검증된 근거·점검·행동 ID만 선택하며, 데이터에 없는 원인·임의 숫자·메타데이터를 최종 응답에 넣을 수 없음
+- [x] 후처리: 허용하지 않은 요약·점검·행동 ID는 `llm_error`, 잘못된 evidence ID는 해당 항목만 제거; 같은 범위의 상충 계산값은 호출 전에 차단
+- [x] fixture 입력의 광고비 +28.0%, 광고매출 +22.4%, ROAS −14.2%p 근거를 서버가 기간·대상·지표·단위와 함께 표시 (main 근거/라우터 회귀 및29a90ea 실제 인사이트/API7개 기록; #22 전용 opt-in은 이번에 실행하지 않음)
 
 ### WU-BE-04 `/api/analyze` · 모듈 연결
 - **담당:** B · **리뷰:** C
@@ -279,11 +284,12 @@
 - **담당:** D · **리뷰:** A
 
 **완료 조건**
-- [ ] `tests/test_ai.py` 에 인사이트 품질 테스트 세트 (최소 5개 시나리오)
-- [ ] 모든 시나리오에서 응답 내 숫자가 입력 KPI 와 일치 (숫자 변조 0건)
-- [ ] 금지 원인어(광고 소재, CTR, CPC, CVR, 경쟁사, 시장 상황)가 단정 표현으로 등장하지 않음 (0건)
-- [ ] 해당 요인 언급 시 `limitations` 에 "확인 불가 + 추가 데이터 필요"로 기술
-- [ ] 테스트 결과를 `DevelopDoc/` 에 기록 (AI 활용 사례 포함)
+> #18 A 승인/main 반영 및 실제 main 품질 회귀 확인 완료. 최신 문서/활용 사례의 main 반영은 #22 A 리뷰·병합 대기다.
+- [x] 인사이트 품질 테스트 최소 5개 이상 구성 (`test_insight_safety.py`, `test_insight_number_grounding.py`, `ai_quality_runner.py`의 실제 인사이트 9개 시나리오)
+- [x] 검증한 시나리오에서 사실 문장은 서버가 검증된 계산값으로 생성하고 호출자의 `plan`/`answer`를 보존 (숫자 변조 0건; 모든 임의 입력의 정확도 보장 아님)
+- [x] 광고 소재·CTR·CPC·CVR·경쟁사·시장 상황 등 입력에 없는 원인을 모델이 단정문으로 생성하는 경로 제거 (허용되지 않은 자유 문장/ID 차단)
+- [x] 필요한 추가 데이터와 현재 확인 불가 범위를 서버의 `limitations`에 기술 (단일 월, ROAS 계산 불가, 불연속 월, 신호 없음 포함)
+- [ ] 최신 테스트 결과와 AI 활용 사례를 `DevelopDoc/AI_RELIABILITY_IMPROVEMENTS.md`, `AI_INSIGHT_SAFETY_TEST_REPORT.md`, `AI_USAGE_CASES.md`에 기록하고 main 반영 (#22 준비 완료, A 리뷰·병합 대기)
 
 ### WU-DA-06 데이터 · 실패 케이스 QA
 - **담당:** C · **리뷰:** D

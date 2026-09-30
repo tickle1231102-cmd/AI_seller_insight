@@ -57,6 +57,7 @@ class PlannerDecision(BaseModel):
     status: Literal["ok", "unsupported_question"]
     plan: AnalysisPlan | None = None
     reason: str | None = None
+    unrepresented_constraints: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_plan_presence(self) -> "PlannerDecision":
@@ -84,20 +85,29 @@ class PlannerResult(BaseModel):
 
 
 class InsightDraft(BaseModel):
-    """Structured output requested from the LLM for the insight explanation.
+    """Text-only LLM output, compatible with OpenAI's strict schema.
 
-    plan/answer are computed upstream and attached afterwards, so they are
-    kept out of this schema (free-form dicts are rejected by strict
-    structured outputs).
+    Keep main's Draft name, but status/reason/plan/answer remain server-owned.
     """
 
-    status: Literal["ok", "unsupported_question"]
-    summary: str = ""
-    evidence: list[str] = Field(default_factory=list)
-    checks: list[str] = Field(default_factory=list)
-    actions: list[str] = Field(default_factory=list)
-    limitations: list[str] = Field(default_factory=list)
-    reason: str | None = None
+    summary: str
+    evidence: list[str]
+    checks: list[str]
+    actions: list[str]
+    limitations: list[str]
+
+
+# Preserve the earlier PR #10 import name without a second, divergent schema.
+InsightContent = InsightDraft
+
+
+class InsightSelection(BaseModel):
+    """Internal model output: IDs only. Public Insight remains unchanged."""
+
+    summary_fact_ids: list[str] = Field(max_length=3)
+    evidence_fact_ids: list[str] = Field(max_length=12)
+    check_ids: list[str] = Field(max_length=3)
+    action_ids: list[str] = Field(max_length=3)
 
 
 class Insight(BaseModel):
