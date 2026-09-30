@@ -9,12 +9,17 @@ EMPTY_FILE → UNKNOWN_PLATFORM → MISSING_COLUMNS → INVALID_PERIOD → INVAL
 """
 
 import io
+import logging
 import re
+import traceback
 from dataclasses import dataclass
+from pathlib import Path
 
 import pandas as pd
 
 from app.core.errors import AppError
+
+logger = logging.getLogger(__name__)
 
 # TECH_SPEC 4-1. 공통 필드 ← 플랫폼 원본 컬럼. 새 플랫폼은 여기에 추가하면 된다.
 PLATFORM_COLUMN_MAP: dict[str, dict[str, str]] = {
@@ -45,6 +50,7 @@ SMARTSTORE_SALES_MAP: dict[str, str] = {
 SMARTSTORE_ID_COLUMN = "채널상품번호"
 SMARTSTORE_NAME_COLUMN = "채널상품명"
 SMARTSTORE_DATE_COLUMN = "날짜"
+SMARTSTORE_TOTAL_LABEL = "전체"  # 기간·일자 합계 행의 상품명·상품번호 값
 # 스마트스토어 판매 분석은 광고 리포트(naver)와 같은 판매액이 겹칠 수 있어 별도 platform 으로 분리한다.
 # kpis·comparison·신호·질문 실행은 이 platform 을 제외하고 계산하고, store 섹션과 rows 에만 나온다.
 STORE_PLATFORM = "naver_store"
@@ -99,6 +105,18 @@ def _read_table(filename: str, content: bytes) -> pd.DataFrame:
             df = pd.read_csv(io.StringIO(_decode(content)), dtype=str, keep_default_na=False)
     except pd.errors.EmptyDataError:
         df = pd.DataFrame()
+    except Exception as exc:  # 깨진 xlsx(zip 아님), 인코딩 불명, 표 형식이 아닌 CSV 등 — 500 대신 파일 문제로 알린다
+        # 예외 메시지·traceback 원문에는 업로드한 셀 값이 들어갈 수 있어 로그에 남기지 않는다.
+        # 코드 버그와 파일 손상을 구분할 수 있게 예외 종류와 발생 위치(파일:줄:함수)만 남긴다.
+        frames = traceback.extract_tb(exc.__traceback__)[-3:][::-1]
+        where = " <- ".join(f"{Path(f.filename).name}:{f.lineno}:{f.name}" for f in frames)
+        logger.warning("파일을 읽지 못했습니다: %s (%s, %s)", filename, type(exc).__name__, where)
+        raise AppError(
+            "UNREADABLE_FILE",
+            f"{filename}: 파일을 읽을 수 없습니다. 파일이 손상되지 않았는지, 엑셀 또는 CSV 형식이 맞는지 확인해주세요.",
+            422,
+            {"file": filename},
+        ) from None
 
     df.columns = [str(c).strip() for c in df.columns]
     df = df.map(lambda v: str(v).strip())
@@ -219,7 +237,21 @@ def _parse(filename: str, content: bytes) -> _Parsed:
                     {"file": filename, "row": row_no, "column": column, "value": record[column]},
                 ) from None
 
-    return _Parsed(platform, periods, field_map, df[id_column].tolist(), df[name_column].tolist(), metrics)
+    product_ids, product_names = df[id_column].tolist(), df[name_column].tolist()
+    if field_map is SMARTSTORE_SALES_MAP:
+        # 내보내기에는 기간·일자별 '전체' 요약 행이 상품 행과 섞여 있다. 그대로 더하면 매출이 여러 배가 되므로
+        # 같은 월에 상품 행이 있을 때만 그 월의 요약 행을 뺀다. 상품 행이 없는 월의 요약 행은 대체할 데이터가 없으니 남긴다.
+        # (오류 행 번호는 파일 기준을 유지하려고 숫자 검증 뒤에 거른다.)
+        is_total = [SMARTSTORE_TOTAL_LABEL in (pid, name) for pid, name in zip(product_ids, product_names)]
+        periods_with_products = {p for p, total in zip(periods, is_total) if not total}
+        keep = [i for i, total in enumerate(is_total) if not total or periods[i] not in periods_with_products]
+        if len(keep) < len(product_ids):
+            periods = [periods[i] for i in keep]
+            product_ids = [product_ids[i] for i in keep]
+            product_names = [product_names[i] for i in keep]
+            metrics = {c: [values[i] for i in keep] for c, values in metrics.items()}
+
+    return _Parsed(platform, periods, field_map, product_ids, product_names, metrics)
 
 
 def preview_file(filename: str, content: bytes) -> dict:

@@ -83,6 +83,61 @@ def test_dash_is_zero_and_daily_rows_are_merged():
     assert (df.loc[0, "orders"], df.loc[0, "visits"], df.loc[0, "refund_count"]) == (20, 400, 2)
 
 
+def total_row(**overrides):
+    return sales_row(채널상품명="전체", 채널상품번호="전체", **overrides)
+
+
+def test_total_rows_are_not_added_on_top_of_product_rows():
+    """실제 내보내기 형식: 기간 요약 행 + 일자별 '전체' 행 + 일자별 상품 행. 상품 행만 합쳐야 매출이 정확하다."""
+    rows = [
+        total_row(**{"판매금액(순)": 1800, "상품결제건수": 20}),  # 기간 요약 행
+        total_row(날짜="2026-09-04", **{"판매금액(순)": 900, "상품결제건수": 10}),
+        sales_row(날짜="2026-09-04", 채널상품번호="P1", 채널상품명="이어폰"),
+        total_row(날짜="2026-09-11", **{"판매금액(순)": 900, "상품결제건수": 10}),
+        sales_row(날짜="2026-09-11", 채널상품번호="P1", 채널상품명="이어폰"),
+    ]
+    content = xlsx(pd.DataFrame(rows))
+    df = normalize.normalize_files([("sales.xlsx", content)])
+    assert list(df["product_id"]) == ["P1"]  # '전체' 가 상품으로 나오지 않는다
+    assert (df.loc[0, "revenue"], df.loc[0, "orders"]) == (1800, 20)
+    assert normalize.preview_file("sales.xlsx", content)["row_count"] == 2
+
+
+def test_total_rows_are_removed_only_in_periods_that_have_product_rows():
+    """8월은 상품 행이 있어 요약 행이 중복이지만, 9월은 '전체' 행뿐이라 대체할 상품 행이 없으므로 남겨야 한다."""
+    rows = [
+        total_row(날짜="2026-08-05", **{"판매금액(순)": 900}),
+        sales_row(날짜="2026-08-05", **{"판매금액(순)": 900}),
+        total_row(날짜="2026-09-05", **{"판매금액(순)": 1800}),
+    ]
+    df = normalize.normalize_files([("sales.xlsx", xlsx(pd.DataFrame(rows)))])
+    by_period = {(r.period, r.product_name): r.revenue for r in df.itertuples()}
+    assert by_period == {("2026-08", "이어폰"): 900, ("2026-09", "전체"): 1800}
+
+
+def test_total_rows_are_removed_in_every_period_independently():
+    rows = [
+        total_row(날짜="2026-08-05", **{"판매금액(순)": 900}),
+        sales_row(날짜="2026-08-05", **{"판매금액(순)": 900}),
+        total_row(날짜="2026-09-05", **{"판매금액(순)": 1800}),
+        sales_row(날짜="2026-09-05", **{"판매금액(순)": 1800}),
+    ]
+    df = normalize.normalize_files([("sales.xlsx", xlsx(pd.DataFrame(rows)))])
+    assert {(r.period, r.product_name): r.revenue for r in df.itertuples()} == {("2026-08", "이어폰"): 900, ("2026-09", "이어폰"): 1800}
+
+
+def test_error_row_number_still_counts_total_rows():
+    rows = [total_row(), sales_row(**{"판매금액(순)": "abc"})]
+    with pytest.raises(AppError) as exc:
+        normalize.normalize_files([("sales.xlsx", xlsx(pd.DataFrame(rows)))])
+    assert exc.value.code == "INVALID_NUMBER" and exc.value.details["row"] == 2
+
+
+def test_file_with_only_total_rows_is_kept():
+    df = normalize.normalize_files([("sales.xlsx", xlsx(pd.DataFrame([total_row(날짜="2026-09-04")])))])
+    assert list(df["product_name"]) == ["전체"]
+
+
 def test_dash_is_invalid_number_outside_smartstore_sales():
     with pytest.raises(AppError) as exc:
         normalize.normalize_files([("coupang_2026-09.csv", "상품ID,상품명,총매출,주문,판매량,광고비,광고매출\nP1,a,-,1,1,0,0\n".encode())])

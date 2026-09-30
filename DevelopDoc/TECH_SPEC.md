@@ -218,6 +218,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | `FILE_TOO_LARGE` | 413 | 파일 크기 초과 |
 | `UNSUPPORTED_FILE_TYPE` | 400 | 허용되지 않은 확장자 |
 | `EMPTY_FILE` | 422 | 데이터 행 없음 |
+| `UNREADABLE_FILE` | 422 | 파일을 표로 읽을 수 없음 (손상된 xlsx, 해독할 수 없는 인코딩 등) |
 | `MISSING_COLUMNS` | 422 | 필수 컬럼 누락 |
 | `INVALID_NUMBER` | 422 | 숫자 변환 실패 |
 | `UNKNOWN_PLATFORM` | 422 | 플랫폼 판별 불가 |
@@ -340,7 +341,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 - 서버가 계산 결과 경로·기간·대상·지표·값·단위를 근거 목록으로 구성한다. LLM은 `InsightSelection`의 `summary_fact_ids`, `evidence_fact_ids`, `check_ids`, `action_ids`만 선택한다. 최종 문장은 서버가 생성하며 숫자를 재계산하지 않는다.
 - `status`·`reason`은 서버가 결정하고 `plan`·`answer`는 호출자가 제공한 계산 결과만 유지한다. LLM의 자유 문장이나 응답 메타데이터는 사용하지 않는다. `InsightDraft`/`InsightContent`는 호환 타입으로 남지만 현재 생성 경로에서는 사용하지 않는다.
 - 요약에 없는 근거 ID, 허용하지 않은 점검·행동 ID 또는 LLM 호출/검증 실패는 `llm_error`로 처리한다. 잘못된 `evidence_fact_ids`는 해당 항목만 제거한다. KPI와 호출자의 계산 결과는 보존한다.
-- 같은 기간·대상·지표의 계산 결과가 서로 다르면 API 호출 전 `llm_error`, 질문의 계산 가능한 답이 없으면 `unsupported_question`으로 처리한다. 유효한 0과 결측값은 구분한다.
+- 같은 기간·대상·지표의 계산 결과가 서로 다르거나 질문의 계산 가능한 답이 없으면 API 호출 전 `unsupported_question`으로 처리한다. 계산 모순에는 원자료 확인 `summary`를 제공하며 반복 LLM 재시도를 권하지 않는다. 유효한 0과 결측값은 구분한다.
 - 점검·행동은 입력 데이터와 신호가 허용하는 문구만 사용한다. 업로드 데이터에 없는 원인을 단정하지 않고, 비교 기간 부재·계산 불가 ROAS·불연속 월·추가로 필요한 자료를 서버가 `limitations`에 안내한다.
 - 근거는 현재 계산 결과 경로를 가리키며 원본 엑셀 셀 추적을 의미하지 않는다. 잘못 계산된 입력을 전부 검산하거나 모든 자연어 조건을 완전히 이해한다고 보장하지 않는다. 평가 범위는 `AI_RELIABILITY_IMPROVEMENTS.md` 참고.
 
@@ -402,7 +403,8 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 - Region: Singapore, Instance: Free
 - Health Check Path: `/health`
 - 환경변수: `PYTHON_VERSION=3.12.10`, `ALLOWED_ORIGINS`, `LLM_MODE` (API 키는 Render 대시보드에서만 입력)
-- 저장소를 Public Git Repository 로 연결해 `main` 머지 후 자동 배포가 되지 않을 수 있음 → Render 에서 **Manual Deploy → Deploy latest commit**
+- 저장소를 Public Git Repository 로 연결해 Render 자체 자동 배포는 동작하지 않음 → GitHub Actions(`.github/workflows/render-deploy.yml`)가 `main` 에 `backend/` 변경이 push 되면 Render **Deploy Hook** 을 호출해 재배포 (URL 은 저장소 Secret `RENDER_DEPLOY_HOOK_URL`)
+- Actions 가 실패하거나 즉시 반영이 필요하면 Actions 탭에서 **Run workflow** 또는 Render 에서 **Manual Deploy → Deploy latest commit**
 
 - Render 무료 플랜 콜드 스타트 대비: 시연 전 `/health` 호출로 워밍업 (첫 요청 최대 50초 이상 지연 가능)
 

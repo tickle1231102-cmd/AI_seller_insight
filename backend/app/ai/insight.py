@@ -32,8 +32,9 @@ def create_insight(
     caller_fields = {"plan": plan, "answer": list(answer) if answer is not None else []}
     catalogue = EvidenceCatalogue.build(kpis, comparison, signals, plan, answer)
     if catalogue.conflicts:
-        return Insight(status="llm_error", **caller_fields,
+        return Insight(status="unsupported_question", **caller_fields,
                        reason="inconsistent_analysis_results",
+                       summary="같은 기간·대상·지표의 계산 결과가 서로 달라 AI 설명을 생성하지 않았습니다. 원자료와 계산 결과를 확인하세요.",
                        limitations=["같은 기간·대상·지표의 계산 결과가 서로 달라 AI 설명을 생성하지 않았습니다. 원자료와 계산 결과를 확인하세요."])
     if plan is not None and not catalogue.answer_ids:
         return Insight(status="unsupported_question", **caller_fields,
