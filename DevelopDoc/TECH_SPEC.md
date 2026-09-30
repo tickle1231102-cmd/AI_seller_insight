@@ -155,7 +155,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 - 기간: 행의 `날짜` 범위 중간이 속한 월, 없으면 파일명. 일자별 행은 월·상품별로 합친다.
 - **`kpis`·`comparison`·`signals` 는 `naver_store` 행을 제외하고 계산**한다. 스토어 파일만 올리면 제외할 행이 없으므로 그 행으로 계산한다.
 - 질문 실행(`run_plan`)은 지표별로 정한다: 기본 지표와 그 증감은 광고 리포트가 있으면 `naver_store` 행을 빼고, 스마트스토어 지표(`visits`·`gross_revenue`·`aov`·`conversion_rate`·`refund_rate`·`discount_rate` 와 그 증감)는 `naver_store` 행만 쓴다 (없으면 `STORE_DATA_NOT_FOUND` → `unsupported_question`). 상세는 `shared/contracts/README.md` 3장.
-- `store` (응답 최상위, 스토어 파일이 없으면 `null`): 스토어 데이터의 최신 월·직전 월 기준 `current`/`previous`/`change`(퍼널·환불률·할인율·객단가), 상품별 `products`(최대 10개), `trend`.
+- `store` (응답 최상위, 스토어 파일이 없으면 `null`): 스토어 데이터의 최신 월·달력상 앞달 기준(앞달 자료가 없으면 `previous`/`change` 는 `null`) `current`/`previous`/`change`(퍼널·환불률·할인율·객단가), 상품별 `products`(최대 10개), `trend`.
 - 방문·검색어·고객 분석 파일은 아직 지원하지 않으며 `UNSUPPORTED_DATASET` 오류를 낸다 (P1).
 
 ## 5. KPI 계산 명세
@@ -173,7 +173,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 
 - 반올림: 표시용 값은 소수 첫째 자리 (`round(x, 1)`), 내부 계산은 원값 유지
 - 분모가 0인 경우 `null` 반환 (0 이나 무한대로 표시하지 않음)
-- 비교 대상 기간: 업로드 데이터의 최신 월 vs 직전 월
+- 비교 대상 기간: 업로드 데이터의 최신 월 vs **달력상 바로 앞달**. 앞달 자료가 없으면(월이 하나뿐이거나 7월+9월처럼 건너뛴 경우) 증감은 모두 `null` (`kpis.previous_period` 도 `null`)
 
 ### 5-1. 검증용 예시 (fixture 정답)
 

@@ -28,7 +28,8 @@ class FakeAI:
         self.insight_error = insight_error
         self.insight_calls = []
 
-    def create_analysis_plan(self, question):
+    def create_analysis_plan(self, question, **kwargs):
+        self.plan_kwargs = kwargs
         if self.plan_status == "ok":
             return SimpleNamespace(status="ok", plan=PLAN, reason=None)
         return SimpleNamespace(status=self.plan_status, plan=None, reason="지원하지 않는 분석 질문입니다.")
@@ -95,6 +96,7 @@ def test_with_question_runs_plan(fake_analysis, monkeypatch):
     assert insight["plan"] == PLAN
     assert insight["answer"] == [{"platform": "coupang", "roas": 291.7}]
     assert ai.insight_calls[0]["answer"] == [{"platform": "coupang", "roas": 291.7}]
+    assert ai.plan_kwargs["periods"] == sorted(ai.plan_kwargs["periods"]) and ai.plan_kwargs["periods"]
 
 
 def test_unsupported_question(fake_analysis, monkeypatch):

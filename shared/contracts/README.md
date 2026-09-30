@@ -129,7 +129,7 @@ B 의 `routers/preview.py`, `routers/analyze.py` 가 아래 함수를 호출한�
 - 행 순서는 `period` → `platform` → `product_id`. 여러 파일의 오류는 `details.file` 로 구분한다.
 
 **KPI·비교 (`compute_kpis`, `build_comparison`)**
-- 비교 기간은 데이터에 있는 최신 월과 그 직전 월이다 (달력상 바로 앞달이 아니어도 된다). 월이 하나뿐이면 `previous_period`, `previous`, `change` 의 모든 값이 `null`.
+- 비교 기간은 데이터에 있는 최신 월과 **달력상 바로 앞달**이다 (2026-01 의 앞달은 2025-12). 앞달 자료가 없으면 — 월이 하나뿐이거나 7월+9월처럼 건너뛴 경우 — `previous_period`, `previous`, `change` 의 모든 값이 `null` 이다 (더 오래된 월과 "전월 대비"로 비교하지 않는다). `comparison.trend` 에는 업로드한 월이 그대로 나온다. 스마트스토어 `store` 도 같은 규칙이다.
 - 증감률은 소수 첫째 자리 반올림. 분모(전월 값)가 0 이면 `null`. `roas_change_pp` 는 반올림 전 ROAS 끼리 뺀 값이다.
 - ROAS = Σ`ad_revenue` ÷ Σ`ad_spend` × 100. 그룹·플랫폼별 ROAS 도 행 평균이 아니라 합계로 다시 계산하고, `ad_spend` 합이 0 이면 `null`.
 - `comparison.by_platform` 은 최신 월 기준(플랫폼 이름순), `trend` 는 전체 기간(오래된 월부터).
@@ -160,7 +160,7 @@ B 의 `routers/preview.py`, `routers/analyze.py` 가 아래 함수를 호출한�
 | 스마트스토어 지표, 스마트스토어 전월 대비 | `naver_store` 행만. 없으면 `STORE_DATA_NOT_FOUND` |
 
 *전월 대비 지표 (`*_change`, `*_change_pp`)*
-- 기준 월은 `period` (`null` 이면 위 범위 안의 최신 월), 비교 월은 **달력상 앞달**이다 (2026-01 → 2025-12). `kpis` 의 비교 월도 #27 병합 후에는 같은 규칙이다 (병합 전 `main` 의 `kpis` 는 직전 업로드 월). 앞달 자료가 없으면 더 오래된 월로 대신하지 않고 `PREVIOUS_PERIOD_NOT_FOUND` 를 던진다.
+- 기준 월은 `period` (`null` 이면 위 범위 안의 최신 월), 비교 월은 **달력상 앞달**이다 (2026-01 → 2025-12). `kpis`·`store` 의 비교 월과 같은 규칙이다 (위 "KPI·비교" 참고). 앞달 자료가 없으면 더 오래된 월로 대신하지 않고 `PREVIOUS_PERIOD_NOT_FOUND` 를 던진다.
 - 금액·건수는 증감률(%), `roas`·`conversion_rate`·`refund_rate`·`discount_rate` 는 증감(%p) 이다. 둘 다 소수 첫째 자리 반올림이고, %p 는 반올림 전 값끼리 뺀다. 지표 이름 대응은 3장 표 참고.
 - 답 행의 키: 그룹 키 + `{원 지표}_previous` + `{원 지표}` + `{증감 지표}`. 예: `{platform, roas_previous, roas, roas_change_pp}`, `group_by` 없음 → `{revenue_previous, revenue, revenue_change}`. 전월에 없던 그룹(예: 새 상품)의 `{원 지표}_previous` 는 합계 지표(`revenue`·`orders`·`units`·`ad_spend`·`ad_revenue`·`visits`·`gross_revenue`)는 0, 분모가 0이라 계산할 수 없는 지표(`roas`·`aov`·`conversion_rate`·`refund_rate`·`discount_rate`)는 `null` 이다. 두 경우 모두 증감은 `null`.
 - `group_by` 는 `platform`·`product`·없음만 된다. `period` 로 묶으면 `UNSUPPORTED_PLAN` (월별 변화는 `trend` 나 기본 지표의 `group_by="period"` 로 본다).
