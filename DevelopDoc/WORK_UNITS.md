@@ -191,9 +191,9 @@
 - **담당:** C · **리뷰:** D
 
 **완료 조건**
-- [x] `compare.py` 에서 최신 월 vs 직전 월 증감률(%) 및 ROAS 증감(%p) 계산 (실제 구현 위치는 `kpi.py::compute_kpis`, `compare.py` 는 플랫폼 비교·추이·계획 실행 담당)
+- [x] `compare.py` 에서 최신 월 vs 달력상 바로 앞달 증감률(%) 및 ROAS 증감(%p) 계산. 앞달 자료가 없으면 `previous_period`·`previous` 는 `null` 이고 `change` 는 객체로 오되 각 지표 값이 `null` (#27, 실제 구현 위치는 `kpi.py::compute_kpis`, `compare.py` 는 플랫폼 비교·추이·계획 실행 담당)
 - [x] 전월 값 0 → 증감률 `null` (`test_previous_zero_revenue_change_is_null`)
-- [x] 데이터가 한 달뿐이면 `change` 는 `null`, 오류 없이 반환 (`test_single_month_has_no_previous`)
+- [x] 데이터가 한 달뿐이면 `previous_period`·`previous` 는 `null`, `change` 의 각 지표 값이 `null` 이고 오류 없이 반환 (`test_single_month_has_no_previous`)
 - [x] `by_platform`, `trend` 생성 (`test_build_comparison_matches_expected`)
 - [x] `run_plan(df, plan)` 이 `AnalysisPlan` 을 받아 정렬·그룹·limit 적용 결과 반환 (`test_run_plan_*`, D 의 `AnalysisPlan` 모델로도 실행 확인)
 - [x] fixture 결과가 매출 +21.2%, 광고비 +28.0%, ROAS −14.2%p 로 일치 (`test_compute_kpis_matches_expected`)
