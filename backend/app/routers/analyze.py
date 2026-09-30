@@ -38,7 +38,8 @@ def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | 
         plan, answer = None, None
 
         if question:
-            plan_result = ai.create_analysis_plan(question)  # D
+            periods = sorted(df["period"].unique())
+            plan_result = ai.create_analysis_plan(question, periods=periods)  # D
             if plan_result.status == "unsupported_question":
                 return Insight(status="unsupported_question", summary=plan_result.reason or "")
             if plan_result.status != "ok":
@@ -77,7 +78,8 @@ def _analyze(uploads: list[UploadedFile], question: str | None) -> AnalyzeRespon
     store = kpi.compute_store_kpis(df)  # 4-1 스마트스토어 판매 분석 (없으면 None)
     comparison = compare.build_comparison(core)  # 5
     sigs = signals.detect_signals(kpis, comparison)  # 6
-    insight = _run_ai(core, kpis, comparison, sigs, question)  # 7·8
+    # 질문은 전체 행을 넘긴다. run_plan 이 지표마다 스마트스토어 행을 쓸지 뺄지 정한다.
+    insight = _run_ai(df, kpis, comparison, sigs, question)  # 7·8
     return AnalyzeResponse(  # 9
         kpis=kpis,
         comparison=comparison,

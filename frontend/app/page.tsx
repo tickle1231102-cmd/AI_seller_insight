@@ -29,19 +29,21 @@ export default function Home() {
   const nextId = useRef(0);
 
   const handleFilesChange = async (next: File[]) => {
-    setFiles(next);
     setError(null);
     if (next.length === 0) {
+      setFiles(next);
       setPreviews([]);
       setStatus("idle");
       return;
     }
     const invalid = validateFiles(next);
     if (invalid) {
+      // 개수·크기·확장자 오류면 새 파일을 목록에 넣지 않고 기존 목록을 유지한다.
       setError(invalid);
       setStatus("error");
       return;
     }
+    setFiles(next);
     setStatus("uploading");
     try {
       const res = await previewFiles(next);
@@ -105,6 +107,7 @@ export default function Home() {
         files={files}
         previews={previews}
         busy={busy}
+        checking={status === "uploading"}
         onFilesChange={handleFilesChange}
         onAnalyze={runAnalyze}
       />

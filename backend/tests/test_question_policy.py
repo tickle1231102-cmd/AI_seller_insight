@@ -13,10 +13,11 @@ CASES = json.loads(Path(__file__).with_name("ai_quality_cases.json").read_text(e
 def test_question_requirements_accept_supported_and_reject_unrepresentable(case):
     expected = case["expected"]
     if expected["status"] != "ok":
-        assert inspect_question(case["question"]).reason
+        assert inspect_question(case["question"], periods=case.get("periods")).reason
         return
     values = {k: v for k, v in expected.items() if k != "status"}
     result = create_analysis_plan(case["question"],
+        periods=case.get("periods"),
         llm=FakeStructuredLLM(PlannerDecision(status="ok", plan=AnalysisPlan(**values))))
     assert result.status == "ok"
     for key, value in values.items():
@@ -83,3 +84,39 @@ def test_duration_is_not_silently_replaced_with_top_n_or_all_months(question):
 def test_real_top_n_still_preserves_count():
     assert inspect_question("매출 높은 상품 3개").expected["limit"] == 3
     assert inspect_question("광고비 높은 플랫폼").expected["metric"] == "ad_spend"
+
+
+@pytest.mark.parametrize("question, expected", [
+    ("8월 매출", "2026-08"), ("이번 달 매출", "2026-09"),
+    ("지난달 매출", "2026-08"), ("전월 매출", "2026-08"),
+    ("2025-12 매출", "2025-12"), ("7월 매출", "2026-07"),
+])
+def test_month_resolution_preserves_requested_target(question, expected):
+    r = inspect_question(question, periods=["2026-09", "2026-07", "2026-08"])
+    assert r.reason is None and r.expected["period"] == expected
+
+
+def test_gap_and_year_boundary_do_not_choose_previous_uploaded_month():
+    assert inspect_question("지난달 매출", periods=["2026-07", "2026-09"]).expected["period"] == "2026-08"
+    assert inspect_question("지난달 매출", periods=["2026-01"]).expected["period"] == "2025-12"
+    assert inspect_question("8월 매출", periods=["2025-08", "2026-08"]).reason
+    assert inspect_question("9월 매출", periods=[]).reason
+
+
+@pytest.mark.parametrize("question, metric", [
+    ("전월 대비 매출 증가율이 큰 플랫폼", "revenue_change"),
+    ("방문수", "visits"), ("구매전환율", "conversion_rate"),
+    ("환불률", "refund_rate"), ("할인율", "discount_rate"),
+    ("객단가", "aov"), ("판매금액(총)", "gross_revenue"),
+    ("전월 대비 ROAS", "roas_change_pp"),
+    ("환불률 전월 대비", "refund_rate_change_pp"),
+])
+def test_new_metric_conditions_and_model_mismatch_are_checked(question, metric):
+    r = inspect_question(question, periods=["2026-08", "2026-09"])
+    assert r.reason is None and r.expected["metric"] == metric
+    assert create_analysis_plan(question, periods=["2026-08", "2026-09"], llm=FakeStructuredLLM(
+        PlannerDecision(status="ok", plan=AnalysisPlan(metric="orders")))).status == "unsupported_question"
+
+
+def test_monthly_change_is_rejected_without_dropping_grouping():
+    assert create_analysis_plan("월별 전월 대비 매출", llm=MustNotCall()).status == "unsupported_question"

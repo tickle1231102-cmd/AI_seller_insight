@@ -201,7 +201,7 @@ def test_provider_failure_retains_deterministic_plan_and_answer():
 def test_real_csv_api_preserves_contract_and_results(monkeypatch, with_question, unsafe):
     llm = FakeInsightLLM(selection(summary_fact_ids=["fabricated"] if unsafe else ["kpis.current.revenue"]))
     monkeypatch.setattr(analyze_router, "_load_ai", lambda: SimpleNamespace(
-        create_analysis_plan=lambda question: PlannerResult(status="ok", plan=PLAN),
+        create_analysis_plan=lambda question, **kwargs: PlannerResult(status="ok", plan=PLAN),
         create_insight=partial(create_insight, llm=llm)))
     fixtures = Path(__file__).resolve().parents[2] / "shared" / "fixtures"
     files = [("files", (p.name, p.read_bytes(), "text/csv")) for p in sorted(fixtures.glob("*.csv"))]

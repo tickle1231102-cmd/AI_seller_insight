@@ -61,7 +61,7 @@ def test_mixed_smartstore_upload_preserves_store_and_caller_results(monkeypatch,
                     "answer": [{"revenue": 999999999999999}], "reason": "injected"}
 
     monkeypatch.setattr(analyze_router, "_load_ai", lambda: SimpleNamespace(
-        create_analysis_plan=lambda question: PlannerResult(status="ok", plan=plan),
+        create_analysis_plan=lambda question, **kwargs: PlannerResult(status="ok", plan=plan),
         create_insight=partial(create_insight, llm=FakeLLM()),
     ))
     files = [("files", (name, data, "application/octet-stream")) for name, data in uploads]
