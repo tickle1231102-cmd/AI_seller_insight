@@ -18,14 +18,30 @@ const COLUMN_LABEL: Record<string, string> = {
   ad_spend: "광고비",
   ad_revenue: "광고매출",
   roas: "ROAS",
+  revenue_previous: "전월 매출",
+  orders_previous: "전월 주문",
+  units_previous: "전월 판매량",
+  ad_spend_previous: "전월 광고비",
+  ad_revenue_previous: "전월 광고매출",
+  roas_previous: "전월 ROAS",
+  revenue_change: "매출 증감",
+  orders_change: "주문 증감",
+  units_change: "판매량 증감",
+  ad_spend_change: "광고비 증감",
+  ad_revenue_change: "광고매출 증감",
+  roas_change_pp: "ROAS 증감",
 };
+
+const WON_KEYS = new Set(["revenue", "ad_spend", "ad_revenue", "revenue_previous", "ad_spend_previous", "ad_revenue_previous"]);
 
 function formatCell(key: string, v: unknown): string {
   if (v === null || v === undefined) return "-";
   if (key === "platform") return platformLabel(String(v));
   if (typeof v !== "number") return String(v);
-  if (key === "roas") return `${v.toFixed(1)}%`;
-  if (key === "revenue" || key === "ad_spend" || key === "ad_revenue") return `${Math.round(v).toLocaleString("ko-KR")}원`;
+  if (key === "roas" || key === "roas_previous") return `${v.toFixed(1)}%`;
+  if (key === "roas_change_pp") return `${v > 0 ? "+" : ""}${v.toFixed(1)}%p`;
+  if (key.endsWith("_change")) return `${v > 0 ? "+" : ""}${v.toFixed(1)}%`;
+  if (WON_KEYS.has(key)) return `${Math.round(v).toLocaleString("ko-KR")}원`;
   return v.toLocaleString("ko-KR");
 }
 

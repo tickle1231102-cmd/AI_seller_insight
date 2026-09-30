@@ -12,6 +12,13 @@ Metric = Literal[
     "ad_spend",
     "ad_revenue",
     "roas",
+    # 전월 대비 증감 (금액·건수는 %, ROAS 는 %p)
+    "revenue_change",
+    "orders_change",
+    "units_change",
+    "ad_spend_change",
+    "ad_revenue_change",
+    "roas_change_pp",
 ]
 GroupBy = Literal["platform", "period", "product"]
 SortOrder = Literal["asc", "desc"]
