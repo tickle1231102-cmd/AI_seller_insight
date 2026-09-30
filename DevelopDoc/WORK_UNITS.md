@@ -187,7 +187,7 @@
 - **담당:** C · **리뷰:** D
 
 **완료 조건**
-- [x] `compare.py` 에서 최신 월 vs 직전 월 증감률(%) 및 ROAS 증감(%p) 계산 (실제 구현 위치는 `kpi.py::compute_kpis`, `compare.py` 는 플랫폼 비교·추이·계획 실행 담당)
+- [x] `compare.py` 에서 최신 월 vs 달력상 바로 앞달 증감률(%) 및 ROAS 증감(%p) 계산, 앞달 자료가 없으면 비교하지 않고 `null` (#27, 실제 구현 위치는 `kpi.py::compute_kpis`, `compare.py` 는 플랫폼 비교·추이·계획 실행 담당)
 - [x] 전월 값 0 → 증감률 `null` (`test_previous_zero_revenue_change_is_null`)
 - [x] 데이터가 한 달뿐이면 `change` 는 `null`, 오류 없이 반환 (`test_single_month_has_no_previous`)
 - [x] `by_platform`, `trend` 생성 (`test_build_comparison_matches_expected`)
