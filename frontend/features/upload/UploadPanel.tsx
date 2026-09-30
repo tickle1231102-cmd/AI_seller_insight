@@ -9,11 +9,24 @@ interface Props {
   previews: PreviewFile[];
   busy: boolean;
   checking: boolean;
+  periodInputs: Record<string, string>;
+  missingPeriods: number;
+  onPeriodChange: (filename: string, period: string) => void;
   onFilesChange: (files: File[]) => void;
   onAnalyze: () => void;
 }
 
-export function UploadPanel({ files, previews, busy, checking, onFilesChange, onAnalyze }: Props) {
+export function UploadPanel({
+  files,
+  previews,
+  busy,
+  checking,
+  periodInputs,
+  missingPeriods,
+  onPeriodChange,
+  onFilesChange,
+  onAnalyze,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [openPreview, setOpenPreview] = useState<string | null>(null);
@@ -70,10 +83,23 @@ export function UploadPanel({ files, previews, busy, checking, onFilesChange, on
                   <span className="muted small">{formatBytes(f.size)}</span>
                   {p ? (
                     <span className="muted">
-                      {platformLabel(p.platform)} · {p.periods.length ? p.periods.join(", ") : "기간 정보 없음 · 함께 올린 파일의 월로 간주"} · {p.row_count}행
+                      {platformLabel(p.platform)} · {p.periods.length ? `${p.periods.join(", ")} · ` : ""}
+                      {p.row_count}행
                     </span>
                   ) : (
                     <span className="muted">{checking ? "확인 중..." : "확인 실패"}</span>
+                  )}
+                  {p && p.periods.length === 0 && (
+                    <label className={`period-input${periodInputs[f.name] ? "" : " is-missing"}`}>
+                      <span className="small">기간 정보 없음 · 월 선택</span>
+                      <input
+                        type="month"
+                        value={periodInputs[f.name] ?? ""}
+                        onChange={(e) => onPeriodChange(f.name, e.target.value)}
+                        disabled={busy}
+                        aria-label={`${f.name} 기간(월)`}
+                      />
+                    </label>
                   )}
                   <span className="file-actions">
                     {p && (
@@ -113,7 +139,12 @@ export function UploadPanel({ files, previews, busy, checking, onFilesChange, on
             </div>
           )}
 
-          <button className="btn primary" onClick={onAnalyze} disabled={busy}>
+          {missingPeriods > 0 && (
+            <p className="notice warn small">
+              기간 정보가 없는 파일 {missingPeriods}개가 있어요. 각 파일의 월을 선택해야 분석을 시작할 수 있습니다.
+            </p>
+          )}
+          <button className="btn primary" onClick={onAnalyze} disabled={busy || missingPeriods > 0}>
             {busy ? "분석 중..." : "분석 시작"}
           </button>
         </>

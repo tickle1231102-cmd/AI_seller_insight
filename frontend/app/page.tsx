@@ -21,6 +21,8 @@ const errorMessage = (e: unknown) =>
 export default function Home() {
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<PreviewFile[]>([]);
+  // 파일에 기간 정보가 없어(미리보기 periods 가 빈 배열) 사용자가 고른 월 { 파일명: "YYYY-MM" }
+  const [periodInputs, setPeriodInputs] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
@@ -33,6 +35,7 @@ export default function Home() {
     if (next.length === 0) {
       setFiles(next);
       setPreviews([]);
+      setPeriodInputs({});
       setStatus("idle");
       return;
     }
@@ -48,12 +51,18 @@ export default function Home() {
     try {
       const res = await previewFiles(next);
       setPreviews(res.files);
+      // 목록에서 빠진 파일의 입력값은 버린다
+      setPeriodInputs((prev) =>
+        Object.fromEntries(Object.entries(prev).filter(([name]) => next.some((f) => f.name === name))),
+      );
       setStatus(result ? "done" : "idle");
     } catch (e) {
       setError(errorMessage(e));
       setStatus("error");
     }
   };
+
+  const missingPeriods = previews.filter((p) => p.periods.length === 0 && !periodInputs[p.filename]);
 
   const runAnalyze = async () => {
     const invalid = validateFiles(files);
@@ -65,7 +74,7 @@ export default function Home() {
     setError(null);
     setStatus("analyzing");
     try {
-      setResult(await analyzeFiles(files));
+      setResult(await analyzeFiles(files, undefined, periodInputs));
       setStatus("done");
     } catch (e) {
       setError(errorMessage(e));
@@ -77,7 +86,7 @@ export default function Home() {
     setMessages((m) => [...m, { id: nextId.current++, role: "user", text: question }]);
     setChatPending(true);
     try {
-      const res = await analyzeFiles(files, question);
+      const res = await analyzeFiles(files, question, periodInputs);
       setMessages((m) => [...m, { id: nextId.current++, role: "ai", insight: res.insight }]);
     } catch (e) {
       setMessages((m) => [...m, { id: nextId.current++, role: "error", text: errorMessage(e) }]);
@@ -108,6 +117,9 @@ export default function Home() {
         previews={previews}
         busy={busy}
         checking={status === "uploading"}
+        periodInputs={periodInputs}
+        missingPeriods={missingPeriods.length}
+        onPeriodChange={(name, period) => setPeriodInputs((prev) => ({ ...prev, [name]: period }))}
         onFilesChange={handleFilesChange}
         onAnalyze={runAnalyze}
       />
