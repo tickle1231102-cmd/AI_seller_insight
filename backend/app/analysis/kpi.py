@@ -29,16 +29,31 @@ def _pct_change(current: float, previous: float) -> float | None:
     return round((current - previous) / previous * 100, 1) if previous else None
 
 
+def previous_calendar_month(period: str) -> str:
+    """'YYYY-MM' 의 달력상 바로 앞달. 2026-01 → 2025-12."""
+    year, month = (int(part) for part in period.split("-"))
+    year, month = (year - 1, 12) if month == 1 else (year, month - 1)
+    return f"{year:04d}-{month:02d}"
+
+
+def comparison_period(period: str, periods) -> str | None:
+    """'전월 대비' 의 비교 월. 달력상 앞달 자료가 업로드돼 있을 때만 그 월, 없으면 None (예: 7월+9월이면 9월의 비교 월은 없다)."""
+    previous = previous_calendar_month(period)
+    return previous if previous in set(periods) else None
+
+
 def compute_kpis(df) -> dict:
     """정규화 DataFrame → TECH_SPEC 7-4 의 kpis (period, previous_period, current, previous, change).
 
-    비교 대상은 데이터에 있는 최신 월과 그 직전 월이다. 월이 하나뿐이면 previous 관련 값은 모두 None.
+    비교 대상은 데이터에 있는 최신 월과 달력상 바로 앞달이다. 앞달 자료가 없으면(월이 하나뿐이거나 7월+9월처럼
+    건너뛴 경우) previous 관련 값은 모두 None.
     """
     periods = sorted(df["period"].unique())
     period = periods[-1]
     current = totals(df[df["period"] == period])
 
-    if len(periods) == 1:
+    previous_period = comparison_period(period, periods)
+    if previous_period is None:
         change = {f"{f}_change": None for f in SUM_FIELDS}
         return {
             "period": period,
@@ -48,7 +63,6 @@ def compute_kpis(df) -> dict:
             "change": {**change, "roas_change_pp": None},
         }
 
-    previous_period = periods[-2]
     previous = totals(df[df["period"] == previous_period])
     change = {f"{f}_change": _pct_change(current[f], previous[f]) for f in SUM_FIELDS}
     # ROAS 증감은 반올림 전 원값끼리 뺀다 (내부 계산은 원값 유지).
@@ -115,8 +129,8 @@ def _store_change(current: dict, previous: dict | None) -> dict:
 def compute_store_kpis(df: pd.DataFrame) -> dict | None:
     """정규화 DataFrame 중 스마트스토어 판매 분석 행 → AnalyzeResponse.store. 해당 행이 없으면 None.
 
-    기간은 스마트스토어 데이터의 최신 월과 직전 월. products 는 최신 월 상품별 지표(총매출 내림차순, 최대 10개)이며
-    각 상품의 전월 환불률·전환율 증감(%p)을 함께 준다.
+    기간은 스마트스토어 데이터의 최신 월과 달력상 바로 앞달(앞달 자료가 없으면 비교 없음). products 는 최신 월 상품별
+    지표(총매출 내림차순, 최대 10개)이며 각 상품의 전월 환불률·전환율 증감(%p)을 함께 준다.
     """
     store = df[df["platform"] == STORE_PLATFORM]
     if store.empty:
@@ -124,7 +138,7 @@ def compute_store_kpis(df: pd.DataFrame) -> dict | None:
     store = store.astype({f: "int64" for f in STORE_SUM_FIELDS})
     periods = sorted(store["period"].unique())
     period = periods[-1]
-    previous_period = periods[-2] if len(periods) > 1 else None
+    previous_period = comparison_period(period, periods)
     cur_df = store[store["period"] == period]
     prev_df = store[store["period"] == previous_period] if previous_period else None
     current = store_totals(cur_df)

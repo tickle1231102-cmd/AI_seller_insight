@@ -110,7 +110,7 @@ B 의 `routers/preview.py`, `routers/analyze.py` 가 아래 함수를 호출한�
 - 행 순서는 `period` → `platform` → `product_id`. 여러 파일의 오류는 `details.file` 로 구분한다.
 
 **KPI·비교 (`compute_kpis`, `build_comparison`)**
-- 비교 기간은 데이터에 있는 최신 월과 그 직전 월이다 (달력상 바로 앞달이 아니어도 된다). 월이 하나뿐이면 `previous_period`, `previous`, `change` 의 모든 값이 `null`.
+- 비교 기간은 데이터에 있는 최신 월과 **달력상 바로 앞달**이다 (2026-01 의 앞달은 2025-12). 앞달 자료가 없으면 — 월이 하나뿐이거나 7월+9월처럼 건너뛴 경우 — `previous_period`, `previous`, `change` 의 모든 값이 `null` 이다 (더 오래된 월과 "전월 대비"로 비교하지 않는다). `comparison.trend` 에는 업로드한 월이 그대로 나온다. 스마트스토어 `store` 도 같은 규칙이다.
 - 증감률은 소수 첫째 자리 반올림. 분모(전월 값)가 0 이면 `null`. `roas_change_pp` 는 반올림 전 ROAS 끼리 뺀 값이다.
 - ROAS = Σ`ad_revenue` ÷ Σ`ad_spend` × 100. 그룹·플랫폼별 ROAS 도 행 평균이 아니라 합계로 다시 계산하고, `ad_spend` 합이 0 이면 `null`.
 - `comparison.by_platform` 은 최신 월 기준(플랫폼 이름순), `trend` 는 전체 기간(오래된 월부터).
