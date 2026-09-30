@@ -21,6 +21,8 @@ const MESSAGES: Record<string, (d?: Record<string, unknown>) => string> = {
   FILE_TOO_LARGE: (d) => `${d?.file ? `${d.file}: ` : ""}파일 크기는 5MB 이하여야 합니다.`,
   UNSUPPORTED_FILE_TYPE: (d) => `${d?.file ? `${d.file}: ` : ""}.xlsx 또는 .csv 파일만 업로드할 수 있습니다.`,
   EMPTY_FILE: (d) => `${d?.file ? `${d.file}: ` : ""}데이터가 없는 파일입니다.`,
+  UNREADABLE_FILE: (d) =>
+    `${d?.file ? `${d.file}: ` : ""}파일을 읽을 수 없습니다. 파일이 손상되지 않았는지, 엑셀 또는 CSV 형식이 맞는지 확인해주세요.`,
   MISSING_COLUMNS: (d) =>
     `${d?.file ? `${d.file}: ` : ""}필수 컬럼이 없습니다${Array.isArray(d?.missing) ? ` (${d.missing.join(", ")})` : ""}.`,
   INVALID_NUMBER: (d) =>
