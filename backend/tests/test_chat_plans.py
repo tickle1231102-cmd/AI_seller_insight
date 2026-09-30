@@ -152,3 +152,51 @@ def test_api_mixed_upload_can_answer_store_metric(monkeypatch):
     insight = res.json()["insight"]
     assert insight["status"] == "ok", insight
     assert insight["answer"][0]["product_name"] == "블루투스 스피커"
+
+
+# ---- '전월' = 달력상 바로 앞 달 (D 리뷰 #23) ----
+def _synthetic(periods_revenue):
+    import pandas as pd
+
+    return pd.DataFrame(
+        [
+            {"period": p, "platform": "coupang", "product_id": "P1", "product_name": "a",
+             "revenue": r, "orders": 1, "units": 1, "ad_spend": 10, "ad_revenue": 20}
+            for p, r in periods_revenue
+        ]
+    )
+
+
+def test_change_requires_calendar_previous_month_not_previous_upload():
+    """회귀: 7월·9월만 있으면 9월 '전월 대비'를 7월과 비교해 +100% 로 답했다."""
+    df = _synthetic([("2026-07", 100), ("2026-09", 200)])
+    with pytest.raises(AppError) as exc:
+        compare.run_plan(df, plan(metric="revenue_change"))
+    assert exc.value.code == "PREVIOUS_PERIOD_NOT_FOUND"
+    assert exc.value.details["previous_period"] == "2026-08"
+    assert "2026-08" in exc.value.message
+
+
+def test_change_with_gap_still_works_for_month_that_has_previous():
+    df = _synthetic([("2026-06", 50), ("2026-07", 100), ("2026-09", 200)])
+    assert compare.run_plan(df, plan(metric="revenue_change", period="2026-07")) == [
+        {"revenue_previous": 50, "revenue": 100, "revenue_change": 100.0}
+    ]
+
+
+def test_change_across_year_boundary():
+    df = _synthetic([("2025-12", 100), ("2026-01", 150)])
+    (row,) = compare.run_plan(df, plan(metric="revenue_change"))
+    assert (row["revenue_previous"], row["revenue_change"]) == (100, 50.0)
+
+
+def test_change_january_without_december():
+    df = _synthetic([("2025-11", 100), ("2026-01", 150)])
+    with pytest.raises(AppError) as exc:
+        compare.run_plan(df, plan(metric="revenue_change"))
+    assert exc.value.details["previous_period"] == "2025-12"
+
+
+@pytest.mark.parametrize(("period", "expected"), [("2026-09", "2026-08"), ("2026-01", "2025-12"), ("2026-12", "2026-11")])
+def test_previous_month(period, expected):
+    assert compare._previous_month(period) == expected

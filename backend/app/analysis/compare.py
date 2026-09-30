@@ -136,10 +136,15 @@ def _change(base: str, current: dict, previous: dict) -> float | None:
     return None if cur is None or prev is None else _pct_change(cur, prev)
 
 
-def _run_change_plan(df, plan, metric: str) -> list[dict]:
-    """증감 지표 (예: ad_spend_change) — 기준 월(period, 없으면 최신 월)과 그 직전 월을 그룹별로 비교한다.
+def _previous_month(period: str) -> str:
+    year, month = map(int, period.split("-"))
+    return f"{year - 1}-12" if month == 1 else f"{year}-{month - 1:02d}"
 
-    각 행: 그룹 키, {원 지표}_previous, {원 지표}, {증감 지표}. 직전 월이 없거나 월별로 묶으면 AppError.
+
+def _run_change_plan(df, plan, metric: str) -> list[dict]:
+    """증감 지표 (예: ad_spend_change) — 기준 월(period, 없으면 최신 월)과 달력상 전월을 그룹별로 비교한다.
+
+    각 행: 그룹 키, {원 지표}_previous, {원 지표}, {증감 지표}. 전월 자료가 없거나 월별로 묶으면 AppError.
     """
     base = CHANGE_METRICS[metric]
     df = _scope(df, base)
@@ -164,15 +169,16 @@ def _run_change_plan(df, plan, metric: str) -> list[dict]:
             422,
             {"period": period, "available": available},
         )
-    index = available.index(period)
-    if index == 0:
+    # '전월' 은 직전 업로드 월이 아니라 달력상 바로 앞 달이다 (2026-09 → 2026-08, 2026-01 → 2025-12).
+    previous_period = _previous_month(period)
+    if previous_period not in available:
         raise AppError(
             "PREVIOUS_PERIOD_NOT_FOUND",
-            f"{period} 의 직전 월 데이터가 없어 증감을 계산할 수 없어요. 두 달 이상의 파일을 올려 주세요.",
+            f"{period} 의 전월({previous_period}) 데이터가 없어 증감을 계산할 수 없어요. "
+            f"업로드된 기간은 {', '.join(available)}입니다. {previous_period} 파일도 함께 올려 주세요.",
             422,
-            {"period": period, "available": available},
+            {"period": period, "previous_period": previous_period, "available": available},
         )
-    previous_period = available[index - 1]
     cur_df = df[df["period"] == period]
     prev_df = df[df["period"] == previous_period]
 

@@ -15,7 +15,7 @@ Supported metrics:
 - revenue_change, orders_change, units_change, ad_spend_change, ad_revenue_change:
   전월 대비 증감률(%). Use for "늘어난", "증가한", "줄어든", "감소한", "성장한", "전월 대비".
 - roas_change_pp: ROAS 전월 대비 증감(%p).
-  Change metrics compare the target month with the month right before it.
+  Change metrics compare the target month with the calendar month right before it.
   Use sort="desc" for "가장 많이 늘어난" and sort="asc" for "가장 많이 줄어든".
   Never use group_by="period" with a change metric; use platform, product or null.
 
