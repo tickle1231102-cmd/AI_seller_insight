@@ -40,10 +40,10 @@ def test_mixed_smartstore_upload_preserves_store_and_caller_results(monkeypatch,
              fixtures / "coupang_2026-09.csv"]
     uploads = [(p.name, p.read_bytes()) for p in paths]
     df = normalize.normalize_files(uploads)
-    # PR #17 keeps overlapping SmartStore sales out of the ad-report/AI
-    # scope. The store panel and raw rows still include the uploaded sheets.
-    core = df[df["platform"] != normalize.STORE_PLATFORM]
-    assert set(core["platform"]) == {"coupang"}
+    # core_rows merges SmartStore sales into naver when no overlapping legacy
+    # naver report is uploaded. The store panel and raw rows still include the sheets.
+    core = normalize.core_rows(df)
+    assert set(core["platform"]) == {"coupang", "naver"}
     expected_kpis = kpi.compute_kpis(core)
     expected_store = kpi.compute_store_kpis(df)
     expected_comparison = compare.build_comparison(core)

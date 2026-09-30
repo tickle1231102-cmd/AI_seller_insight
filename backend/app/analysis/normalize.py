@@ -58,6 +58,43 @@ SMARTSTORE_SALES_KEYS = {SMARTSTORE_ID_COLUMN, SMARTSTORE_NAME_COLUMN, "판매�
 # 스마트스토어 방문·검색·고객 분석 파일. 판별만 하고 분석은 아직 지원하지 않는다 (WORK_UNITS P1).
 SMARTSTORE_OTHER_KEYS = {"visit": {"경로(1단계)", "방문수"}, "query": {"검색어", "방문수"}, "customer": {"고객분류", "방문고객수"}}
 
+
+@dataclass(frozen=True)
+class ExportFormat:
+    """플랫폼에서 실제로 내려받는 리포트 1종. keys 컬럼이 모두 있으면 이 형식으로 본다.
+
+    field_map 에 없는 공통 필드는 0 이다. 판매 리포트는 광고 지표가, 광고 리포트는 판매 지표가 없으므로
+    같은 플랫폼의 판매·광고 파일을 함께 올리면 합계에서 서로 겹치지 않고 채워진다.
+    date_column 이 없으면 기간은 파일명 → 같이 올린 다른 파일의 최신 월 순으로 정한다.
+    """
+
+    key: str
+    platform: str
+    keys: frozenset[str]
+    field_map: dict[str, str]
+    id_column: str
+    name_column: str
+    date_column: str | None = None
+
+
+EXPORT_FORMATS = [
+    # 쿠팡 Wing > 판매 분석(Seller Insights) > 옵션별 지표
+    ExportFormat(
+        "coupang_sales", "coupang", frozenset({"옵션 ID", "등록상품ID", "매출(원)"}),
+        {"revenue": "매출(원)", "orders": "주문", "units": "판매량"}, "옵션 ID", "옵션명",
+    ),
+    # 쿠팡 광고센터 > 광고 보고서 (옵션·키워드 단위). 광고매출은 14일 기준 총 전환매출액.
+    ExportFormat(
+        "coupang_ads", "coupang", frozenset({"캠페인 ID", "광고집행 옵션ID", "광고비"}),
+        {"ad_spend": "광고비", "ad_revenue": "총 전환매출액(14일)"}, "광고집행 옵션ID", "광고집행 상품명",
+    ),
+    # 네이버 검색광고 > 다차원 보고서 > 소재 보고서 (쇼핑검색광고는 소재 = 상품)
+    ExportFormat(
+        "naver_ads", "naver", frozenset({"일별", "소재", "총비용"}),
+        {"ad_spend": "총비용", "ad_revenue": "총 전환매출액"}, "소재", "소재", "일별",
+    ),
+]
+
 NORMALIZED_COLUMNS = ["period", "platform", "product_id", "product_name", "revenue", "orders", "units", "ad_spend", "ad_revenue"]
 # 스마트스토어 판매 분석 파일에만 있는 지표. 다른 파일의 행은 None.
 STORE_FIELDS = ["gross_revenue", "visits", "refund_count", "refund_amount", "discount_amount"]
@@ -73,7 +110,8 @@ _NUMBER_RE = re.compile(r"[+-]?(\d+(\.\d*)?|\.\d+)")
 @dataclass
 class _Parsed:
     platform: str
-    periods: list[str]  # 행마다의 기간 (YYYY-MM)
+    periods: list[str | None]  # 행마다의 기간 (YYYY-MM). None 은 EXPORT_FORMATS 파일에 기간 정보가 없는 경우
+    export: ExportFormat | None  # EXPORT_FORMATS 파일이면 그 형식, 아니면 None
     field_map: dict[str, str]  # 공통 필드 → 원본 지표 컬럼명
     product_ids: list[str]
     product_names: list[str]
@@ -160,12 +198,7 @@ def _extract_period(filename: str) -> str:
         return match.group(0)
     period = _midpoint_month(filename)
     if period is None:
-        raise AppError(
-            "INVALID_PERIOD",
-            f"{filename}: 파일명에서 기간(YYYY-MM)을 찾을 수 없습니다. 예: coupang_2026-09.csv",
-            422,
-            {"file": filename},
-        )
+        raise _period_error(filename)
     return period
 
 
@@ -194,9 +227,21 @@ def _reject_other_smartstore(filename: str, columns: list[str]) -> None:
             )
 
 
+def _period_error(filename: str) -> AppError:
+    return AppError(
+        "INVALID_PERIOD",
+        f"{filename}: 파일명에서 기간(YYYY-MM)을 찾을 수 없습니다. 예: coupang_2026-09.csv",
+        422,
+        {"file": filename},
+    )
+
+
 def _parse(filename: str, content: bytes) -> _Parsed:
     df = _read_table(filename, content)
     columns = list(df.columns)
+    export = next((f for f in EXPORT_FORMATS if f.keys <= set(columns)), None)
+    if export is not None:
+        return _parse_export(filename, df, export)
     if SMARTSTORE_SALES_KEYS <= set(columns):
         platform, field_map = STORE_PLATFORM, SMARTSTORE_SALES_MAP
         id_column, name_column = SMARTSTORE_ID_COLUMN, SMARTSTORE_NAME_COLUMN
@@ -224,18 +269,7 @@ def _parse(filename: str, content: bytes) -> _Parsed:
     else:
         periods = [_extract_period(filename)] * len(df)
 
-    metrics: dict[str, list[int | float]] = {c: [] for c in metric_columns}
-    for row_no, record in enumerate(df[metric_columns].to_dict("records"), start=1):  # row_no: 데이터 행 기준 1부터
-        for column in metric_columns:
-            try:
-                metrics[column].append(_to_number(record[column], dash_is_zero=field_map is SMARTSTORE_SALES_MAP))
-            except ValueError:
-                raise AppError(
-                    "INVALID_NUMBER",
-                    f"{filename}: {row_no}행 '{column}' 값 '{record[column]}' 을(를) 숫자로 바꿀 수 없습니다.",
-                    422,
-                    {"file": filename, "row": row_no, "column": column, "value": record[column]},
-                ) from None
+    metrics = _parse_numbers(filename, df, metric_columns, dash_is_zero=field_map is SMARTSTORE_SALES_MAP)
 
     product_ids, product_names = df[id_column].tolist(), df[name_column].tolist()
     if field_map is SMARTSTORE_SALES_MAP:
@@ -251,7 +285,46 @@ def _parse(filename: str, content: bytes) -> _Parsed:
             product_names = [product_names[i] for i in keep]
             metrics = {c: [values[i] for i in keep] for c, values in metrics.items()}
 
-    return _Parsed(platform, periods, field_map, product_ids, product_names, metrics)
+    return _Parsed(platform, periods, None, field_map, product_ids, product_names, metrics)
+
+
+def _parse_numbers(filename: str, df: pd.DataFrame, metric_columns: list[str], *, dash_is_zero: bool) -> dict[str, list[int | float]]:
+    metrics: dict[str, list[int | float]] = {c: [] for c in metric_columns}
+    for row_no, record in enumerate(df[metric_columns].to_dict("records"), start=1):  # row_no: 데이터 행 기준 1부터
+        for column in metric_columns:
+            try:
+                metrics[column].append(_to_number(record[column], dash_is_zero=dash_is_zero))
+            except ValueError:
+                raise AppError(
+                    "INVALID_NUMBER",
+                    f"{filename}: {row_no}행 '{column}' 값 '{record[column]}' 을(를) 숫자로 바꿀 수 없습니다.",
+                    422,
+                    {"file": filename, "row": row_no, "column": column, "value": record[column]},
+                ) from None
+    return metrics
+
+
+def _parse_export(filename: str, df: pd.DataFrame, export: ExportFormat) -> _Parsed:
+    """EXPORT_FORMATS 파일. 기간은 날짜 컬럼 → 파일명 순이고, 둘 다 없으면 None (normalize_files 가 채운다)."""
+    columns = set(df.columns)
+    metric_columns = list(export.field_map.values())
+    missing = [c for c in dict.fromkeys((export.id_column, export.name_column, *metric_columns)) if c not in columns]
+    if missing:
+        raise AppError(
+            "MISSING_COLUMNS",
+            f"{filename} 파일에 {', '.join(repr(c) for c in missing)} 컬럼이 없습니다.",
+            422,
+            {"file": filename, "missing": missing},
+        )
+    match = _PERIOD_RE.search(filename)
+    file_period = match.group(0) if match else _midpoint_month(filename)
+    if export.date_column and export.date_column in columns:
+        periods = [_midpoint_month(v) or file_period for v in df[export.date_column]]
+    else:
+        periods = [file_period] * len(df)
+    metrics = _parse_numbers(filename, df, metric_columns, dash_is_zero=True)
+    return _Parsed(export.platform, periods, export, export.field_map,
+                   df[export.id_column].tolist(), df[export.name_column].tolist(), metrics)
 
 
 def preview_file(filename: str, content: bytes) -> dict:
@@ -269,7 +342,7 @@ def preview_file(filename: str, content: bytes) -> dict:
     return {
         "filename": filename,
         "platform": parsed.platform,
-        "periods": sorted(set(parsed.periods)),
+        "periods": sorted({p for p in parsed.periods if p}),  # 기간 정보가 없는 파일은 [] (분석 때 다른 파일 기간을 쓴다)
         "row_count": len(parsed.product_names),
         "columns": columns,
         "preview": preview,
@@ -285,10 +358,18 @@ def normalize_files(files: list[tuple[str, bytes]]) -> pd.DataFrame:
 
     스마트스토어 판매 분석 파일이 있으면 STORE_FIELDS 5개 컬럼이 붙고(그 외 파일의 행은 None), 광고 지표는 0 이다.
     일자별로 내려받아 같은 월·상품이 여러 행이면 합친다.
+
+    EXPORT_FORMATS 파일은 없는 지표를 0 으로 채우고 같은 월·상품 행을 합친다. 기간 정보가 없는 파일
+    (쿠팡 판매·광고 리포트)은 같이 올린 다른 파일이 모두 한 월일 때만 그 월을 쓰고, 없거나 여러 월이면 INVALID_PERIOD.
     """
+    parsed_files = [(filename, _parse(filename, content)) for filename, content in files]
+    known = {p for _, parsed in parsed_files for p in parsed.periods if p}
     frames = []
-    for filename, content in files:
-        parsed = _parse(filename, content)
+    for filename, parsed in parsed_files:
+        if not all(parsed.periods):
+            if len(known) != 1:  # 기간을 알 수 없거나 여러 월이 섞여 어느 월인지 모호하면 추정하지 않는다
+                raise _period_error(filename)
+            parsed.periods = [p or next(iter(known)) for p in parsed.periods]
         values = {field: [int(round(v)) for v in parsed.metrics[column]] for field, column in parsed.field_map.items()}
         frame = pd.DataFrame(
             {
@@ -299,9 +380,10 @@ def normalize_files(files: list[tuple[str, bytes]]) -> pd.DataFrame:
                 **values,
             }
         )
-        if parsed.is_smartstore:
-            frame["ad_spend"] = 0
-            frame["ad_revenue"] = 0
+        if parsed.is_smartstore or parsed.export is not None:
+            for field in NORMALIZED_COLUMNS[4:]:
+                if field not in frame:
+                    frame[field] = 0
             keys = ["period", "platform", "product_id"]
             names = frame.groupby(keys, sort=False)["product_name"].first()
             frame = frame.drop(columns="product_name").groupby(keys, sort=False).sum().join(names).reset_index()
@@ -314,3 +396,19 @@ def normalize_files(files: list[tuple[str, bytes]]) -> pd.DataFrame:
     else:
         df = df[NORMALIZED_COLUMNS]
     return df.sort_values(["period", "platform", "product_id"], kind="stable").reset_index(drop=True)
+
+
+def core_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """kpis·comparison·신호·질문(스마트스토어 전용 지표 제외)에 쓰는 행.
+
+    예전 naver 리포트(판매+광고가 한 파일)는 스마트스토어 판매 분석과 판매액이 겹치므로, 같은 월에 판매 수치가 있는
+    naver 행이 있으면 그 월의 스마트스토어 행만 뺀다. 그 외 월(실제 내보내기 조합: 스마트스토어 판매 + 네이버 광고
+    리포트)은 겹치지 않으므로 스마트스토어 행을 naver 로 합친다. 스마트스토어 파일만 올린 경우는 그대로 둔다.
+    """
+    is_store = df["platform"] == STORE_PLATFORM
+    if not is_store.any() or is_store.all():
+        return df
+    legacy = (df["platform"] == "naver") & (df[["revenue", "orders", "units"]].sum(axis=1) > 0)
+    overlapping = is_store & df["period"].isin(set(df.loc[legacy, "period"]))
+    kept = df[~overlapping]
+    return kept.assign(platform=kept["platform"].where(kept["platform"] != STORE_PLATFORM, "naver"))
