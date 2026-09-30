@@ -124,9 +124,14 @@ export function InsightBody({ insight, onRetry }: { insight: Insight; onRetry?: 
   if (insight.status === "unsupported_question") {
     return (
       <div className="notice">
-        {/* 백엔드가 이유(없는 월, 필요한 파일 등)를 주면 그대로 보여준다 */}
+        {/* 백엔드가 이유(없는 월, 필요한 파일, 계산 결과 모순 등)를 주면 그대로 보여준다 */}
         {insight.summary || "이 질문은 현재 데이터로 분석하기 어렵습니다."} 예시:{" "}
         {EXAMPLE_QUESTIONS.map((e) => `“${e}”`).join(", ")}
+        {insight.limitations?.map((l) => (
+          <p key={l} className="muted small">
+            ※ {l}
+          </p>
+        ))}
       </div>
     );
   }
