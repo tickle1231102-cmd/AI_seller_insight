@@ -193,6 +193,17 @@ def test_store_kpis_none_without_smartstore():
     assert kpi.compute_store_kpis(normalize.normalize_files(files([FIXTURES / "naver_2026-09.csv"]))) is None
 
 
+def test_store_has_no_comparison_when_previous_calendar_month_is_missing():
+    """스토어도 KPI 와 같은 규칙: 8월 자료가 없는 7월+9월은 9월을 7월과 비교하지 않는다."""
+    df = normalize.normalize_files(files(SALES))
+    df.loc[df["period"] == "2026-08", "period"] = "2026-07"
+    store = kpi.compute_store_kpis(df)
+    assert store["period"] == "2026-09" and store["previous_period"] is None
+    assert store["previous"] is None and store["change"]["visits_change"] is None
+    assert store["products"][0]["refund_rate_change_pp"] is None
+    assert [t["period"] for t in store["trend"]] == ["2026-07", "2026-09"]  # 추이에는 업로드한 월이 그대로 나온다
+
+
 def test_single_month_has_no_previous():
     store = kpi.compute_store_kpis(normalize.normalize_files(files(SALES[1:])))
     assert store["previous"] is None and store["change"]["visits_change"] is None

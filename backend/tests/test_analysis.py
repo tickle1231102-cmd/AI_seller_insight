@@ -186,15 +186,46 @@ def test_previous_zero_revenue_change_is_null():
     assert kpi.compute_kpis(d)["change"]["revenue_change"] is None
 
 
-def test_compares_latest_with_previous_available_month_even_if_gap():
+def test_no_comparison_when_previous_calendar_month_is_missing():
+    """7월과 9월만 있으면 9월의 '전월(8월)' 자료가 없으므로 7월과 비교하지 않는다."""
     d = make_df(
         ("2026-05", "coupang", "P1", 100, 1, 1, 10, 20),
         ("2026-07", "coupang", "P1", 200, 1, 1, 10, 20),
         ("2026-09", "coupang", "P1", 300, 1, 1, 10, 20),
     )
     k = kpi.compute_kpis(d)
-    assert (k["period"], k["previous_period"]) == ("2026-09", "2026-07")
+    assert k["period"] == "2026-09"
+    assert k["previous_period"] is None and k["previous"] is None
+    assert set(k["change"].values()) == {None}
+    assert signals.detect_signals(k, compare.build_comparison(d)) == []
+
+
+def test_compares_with_calendar_previous_month_even_if_older_months_are_missing():
+    d = make_df(("2026-05", "coupang", "P1", 100, 1, 1, 10, 20), ("2026-08", "coupang", "P1", 200, 1, 1, 10, 20), ("2026-09", "coupang", "P1", 300, 1, 1, 10, 20))
+    k = kpi.compute_kpis(d)
+    assert (k["period"], k["previous_period"]) == ("2026-09", "2026-08")
     assert k["change"]["revenue_change"] == 50.0
+
+
+def test_year_boundary_previous_month_is_december():
+    d = make_df(("2025-12", "coupang", "P1", 100, 1, 1, 10, 20), ("2026-01", "coupang", "P1", 150, 1, 1, 10, 20))
+    k = kpi.compute_kpis(d)
+    assert (k["period"], k["previous_period"]) == ("2026-01", "2025-12")
+    assert k["change"]["revenue_change"] == 50.0
+
+
+@pytest.mark.parametrize(
+    ("period", "expected"),
+    [("2026-09", "2026-08"), ("2026-01", "2025-12"), ("2026-10", "2026-09"), ("2000-01", "1999-12")],
+)
+def test_previous_calendar_month(period, expected):
+    assert kpi.previous_calendar_month(period) == expected
+
+
+def test_comparison_period_requires_uploaded_data():
+    assert kpi.comparison_period("2026-09", ["2026-08", "2026-09"]) == "2026-08"
+    assert kpi.comparison_period("2026-09", ["2026-07", "2026-09"]) is None
+    assert kpi.comparison_period("2026-09", ["2026-09"]) is None
 
 
 def test_roas_change_uses_unrounded_values():
