@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd /Users/yb/Desktop/agent_hackathon01/shared/fixtures/smartstore && curl -s -H \\\"Origin: http://localhost:3010\\\" -F files=@sales_20260801-20260831_sample.xlsx -F files=@sales_20260901-202...",
-  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n  File \"/Users/yb/anaconda3/lib/python3.11/json/__init__.py\", line 293, in load\n    return loads(fp.read(),\n           ^^^^^^^^^^^^^^^^\n  File \"/Users/yb/anaconda3/lib/python3.11/json/__init__.py\", line 346, in loads\n    return _default_decoder.decode(s)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/yb/anaconda3/lib/python3.11/json/decoder.py\", line 337, in decode\n    obj, end = self.raw_decode(s, idx=_w...",
-  "timestamp": "2026-09-29T07:21:29.622Z",
-  "retry_count": 1
-}

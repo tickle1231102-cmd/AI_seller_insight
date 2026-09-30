@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"sed -i '213s/_to_number(record\\\\[column\\\\])/_to_number(record[column], dash_is_zero=field_map is SMARTSTORE_SALES_MAP)/' app/analysis/normalize.py && sed -n 205,218p app/analysis/normalize...",
-  "error": "Exit code 1\nsed: 1: \"app/analysis/normalize.py\n\": command a expects \\ followed by text",
-  "timestamp": "2026-09-29T08:09:31.581Z",
-  "retry_count": 2
-}
