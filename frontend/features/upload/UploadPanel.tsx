@@ -8,11 +8,12 @@ interface Props {
   files: File[];
   previews: PreviewFile[];
   busy: boolean;
+  checking: boolean;
   onFilesChange: (files: File[]) => void;
   onAnalyze: () => void;
 }
 
-export function UploadPanel({ files, previews, busy, onFilesChange, onAnalyze }: Props) {
+export function UploadPanel({ files, previews, busy, checking, onFilesChange, onAnalyze }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [openPreview, setOpenPreview] = useState<string | null>(null);
@@ -72,7 +73,7 @@ export function UploadPanel({ files, previews, busy, onFilesChange, onAnalyze }:
                       {platformLabel(p.platform)} · {p.periods.join(", ")} · {p.row_count}행
                     </span>
                   ) : (
-                    <span className="muted">확인 중...</span>
+                    <span className="muted">{checking ? "확인 중..." : "확인 실패"}</span>
                   )}
                   <span className="file-actions">
                     {p && (
