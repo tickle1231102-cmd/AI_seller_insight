@@ -62,3 +62,35 @@ def test_analyze_merges_smartstore_into_naver():
     assert set(by_platform) == {"coupang", "naver"}
     assert by_platform["naver"]["revenue"] == body["store"]["current"]["revenue"]
     assert by_platform["naver"]["roas"] is not None and by_platform["coupang"]["roas"] is not None
+
+
+def test_undated_export_with_multiple_months_is_ambiguous():
+    """리뷰 회귀: 8·9월 자료와 함께 올리면 기간 없는 쿠팡 파일의 월을 추정하지 않는다."""
+    uploads = files([COUPANG_SALES, NAVER_ADS]) + [("sales_20260801-20260831.xlsx", _store_file("2026-08-01~2026-08-31"))]
+    with pytest.raises(AppError) as exc:
+        normalize.normalize_files(uploads)
+    assert exc.value.code == "INVALID_PERIOD" and exc.value.details["file"] == COUPANG_SALES.name
+
+
+def _store_file(date: str) -> bytes:
+    import io
+
+    row = {c: 0 for c in normalize.SMARTSTORE_SALES_MAP.values()}
+    row.update({"날짜": date, "채널상품명": "이어폰", "채널상품번호": "P1", "판매금액(순)": 200, "판매금액(총)": 200})
+    buf = io.BytesIO()
+    pd.DataFrame([row]).to_excel(buf, index=False)
+    return buf.getvalue()
+
+
+def test_core_rows_excludes_store_only_in_overlapping_month():
+    """리뷰 회귀: 8월 예전 naver 매출 100 + 9월 스마트스토어 매출 200 + 9월 naver 광고행 → 9월 매출 200 유지."""
+    base = {"product_id": "P1", "product_name": "이어폰", "orders": 0, "units": 0, "ad_spend": 0, "ad_revenue": 0}
+    df = pd.DataFrame([
+        {**base, "period": "2026-08", "platform": "naver", "revenue": 100},
+        {**base, "period": "2026-08", "platform": "naver_store", "revenue": 100},
+        {**base, "period": "2026-09", "platform": "naver_store", "revenue": 200},
+        {**base, "period": "2026-09", "platform": "naver", "revenue": 0, "ad_spend": 50},
+    ])
+    core = normalize.core_rows(df)
+    assert core.groupby("period")["revenue"].sum().to_dict() == {"2026-08": 100, "2026-09": 200}
+    assert set(core["platform"]) == {"naver"}

@@ -70,7 +70,7 @@ export function UploadPanel({ files, previews, busy, checking, onFilesChange, on
                   <span className="muted small">{formatBytes(f.size)}</span>
                   {p ? (
                     <span className="muted">
-                      {platformLabel(p.platform)} · {p.periods.length ? p.periods.join(", ") : "기간: 함께 올린 파일 기준"} · {p.row_count}행
+                      {platformLabel(p.platform)} · {p.periods.length ? p.periods.join(", ") : "기간 정보 없음 · 함께 올린 파일의 월로 간주"} · {p.row_count}행
                     </span>
                   ) : (
                     <span className="muted">{checking ? "확인 중..." : "확인 실패"}</span>

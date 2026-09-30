@@ -360,16 +360,16 @@ def normalize_files(files: list[tuple[str, bytes]]) -> pd.DataFrame:
     일자별로 내려받아 같은 월·상품이 여러 행이면 합친다.
 
     EXPORT_FORMATS 파일은 없는 지표를 0 으로 채우고 같은 월·상품 행을 합친다. 기간 정보가 없는 파일
-    (쿠팡 판매·광고 리포트)은 같이 올린 다른 파일의 최신 월을 쓰고, 그런 파일도 없으면 INVALID_PERIOD.
+    (쿠팡 판매·광고 리포트)은 같이 올린 다른 파일이 모두 한 월일 때만 그 월을 쓰고, 없거나 여러 월이면 INVALID_PERIOD.
     """
     parsed_files = [(filename, _parse(filename, content)) for filename, content in files]
-    known = [p for _, parsed in parsed_files for p in parsed.periods if p]
+    known = {p for _, parsed in parsed_files for p in parsed.periods if p}
     frames = []
     for filename, parsed in parsed_files:
         if not all(parsed.periods):
-            if not known:
+            if len(known) != 1:  # 기간을 알 수 없거나 여러 월이 섞여 어느 월인지 모호하면 추정하지 않는다
                 raise _period_error(filename)
-            parsed.periods = [p or max(known) for p in parsed.periods]
+            parsed.periods = [p or next(iter(known)) for p in parsed.periods]
         values = {field: [int(round(v)) for v in parsed.metrics[column]] for field, column in parsed.field_map.items()}
         frame = pd.DataFrame(
             {
@@ -401,14 +401,14 @@ def normalize_files(files: list[tuple[str, bytes]]) -> pd.DataFrame:
 def core_rows(df: pd.DataFrame) -> pd.DataFrame:
     """kpis·comparison·신호·질문(스마트스토어 전용 지표 제외)에 쓰는 행.
 
-    예전 naver 리포트(판매+광고가 한 파일)는 스마트스토어 판매 분석과 판매액이 겹치므로, 판매 수치가 있는 naver 행이
-    있으면 스마트스토어 행을 뺀다. 실제 내보내기 조합(스마트스토어 판매 + 네이버 광고 리포트)은 naver 행에 광고 지표만
-    있어 겹치지 않으므로 스마트스토어 행을 naver 로 합친다. 스마트스토어 파일만 올린 경우는 그대로 둔다.
+    예전 naver 리포트(판매+광고가 한 파일)는 스마트스토어 판매 분석과 판매액이 겹치므로, 같은 월에 판매 수치가 있는
+    naver 행이 있으면 그 월의 스마트스토어 행만 뺀다. 그 외 월(실제 내보내기 조합: 스마트스토어 판매 + 네이버 광고
+    리포트)은 겹치지 않으므로 스마트스토어 행을 naver 로 합친다. 스마트스토어 파일만 올린 경우는 그대로 둔다.
     """
     is_store = df["platform"] == STORE_PLATFORM
     if not is_store.any() or is_store.all():
         return df
-    naver = df[df["platform"] == "naver"]
-    if (naver[["revenue", "orders", "units"]].sum(axis=1) > 0).any():
-        return df[~is_store]
-    return df.assign(platform=df["platform"].where(~is_store, "naver"))
+    legacy = (df["platform"] == "naver") & (df[["revenue", "orders", "units"]].sum(axis=1) > 0)
+    overlapping = is_store & df["period"].isin(set(df.loc[legacy, "period"]))
+    kept = df[~overlapping]
+    return kept.assign(platform=kept["platform"].where(kept["platform"] != STORE_PLATFORM, "naver"))
