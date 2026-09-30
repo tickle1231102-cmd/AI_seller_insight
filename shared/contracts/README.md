@@ -40,7 +40,7 @@
 
 > `period` 는 원본 컬럼이 아니라 **파일명**에서 뽑는다 (예: `coupang_2026-09.csv` → `2026-09`). 규칙은 `\d{4}-(0[1-9]|1[0-2])` 이고, 없으면 날짜 범위(`sales_20260830-20260928.xlsx` → 중간이 속한 `2026-09`)를 쓰고, 그것도 없으면 `INVALID_PERIOD` 오류. 스마트스토어 판매 파일은 행의 `날짜` 범위가 먼저다.
 > 플랫폼은 파일명이 아니라 **컬럼 구조**로 판별한다 (지표 컬럼 5개 중 3개 이상 일치하는 쪽, 동률·미달이면 `UNKNOWN_PLATFORM`).
-> 스마트스토어 판매 분석(SALES) 파일은 컬럼 `채널상품번호`·`채널상품명`·`판매금액(총)` 으로 판별해 `platform="naver_store"` 로 분리한다. 광고 리포트와 판매액이 겹칠 수 있어 `kpis`·`comparison`·`signals`·`run_plan` 에는 넣지 않고 `rows`·`store` 에만 나온다. 셀 값 `-` 는 이 파일에서만 0 이다 (그 외는 `INVALID_NUMBER`).
+> 스마트스토어 판매 분석(SALES) 파일은 컬럼 `채널상품번호`·`채널상품명`·`판매금액(총)` 으로 판별해 `platform="naver_store"` 로 분리한다. 광고 리포트와 판매액이 겹칠 수 있어 `kpis`·`comparison`·`signals` 에는 넣지 않고 `rows`·`store` 에 나온다. 질문 실행(`run_plan`)은 지표마다 다르다 — 기본 지표(`revenue` 등 6개와 그 증감)는 광고 리포트가 함께 있으면 이 행을 빼고, 스마트스토어 지표(`visits`·`gross_revenue`·`aov`·`conversion_rate`·`refund_rate`·`discount_rate` 와 그 증감)는 이 행만 쓴다 (3장). 셀 값 `-` 는 이 파일에서만 0 이다 (그 외는 `INVALID_NUMBER`).
 > 금액 필드(`revenue`, `ad_spend`, `ad_revenue`)는 정규화 단계에서 반올림해 정수(원)로 맞춘다.
 > `preview_file` 의 `columns` 는 맨 앞이 `product_name` 이고 그 뒤가 원본 지표 컬럼명이다. 프론트 미리보기 표가 `columns` 를 행의 키로 쓰기 때문이다.
 
@@ -84,7 +84,7 @@ B 의 `routers/preview.py`, `routers/analyze.py` 가 아래 함수를 호출한�
 | 4 KPI | `kpi.compute_kpis(df) -> dict` (응답 `kpis`) | `analysis/kpi.py` (C) | 구현됨 |
 | 5 비교 | `compare.build_comparison(df) -> dict` (응답 `comparison`) | `analysis/compare.py` (C) | 구현됨 |
 | 6 신호 | `signals.detect_signals(kpis, comparison) -> list[dict]` | `analysis/signals.py` (C) | 구현됨 |
-| 7 질문 해석 | `create_analysis_plan(question: str) -> PlannerResult` | `ai/planner.py` (D) | 구현됨 |
+| 7 질문 해석 | `create_analysis_plan(question: str, *, periods: list[str] \| None = None) -> PlannerResult` | `ai/planner.py` (D) | 구현됨 |
 | 7 계획 실행 | `compare.run_plan(df, plan: AnalysisPlan) -> list[dict]` | `analysis/compare.py` (C) | 구현됨 |
 | 8 인사이트 | `create_insight(kpis, comparison, signals, *, plan=None, answer=None) -> Insight` | `ai/insight.py` (D) | 구현됨 |
 
@@ -95,6 +95,25 @@ B 의 `routers/preview.py`, `routers/analyze.py` 가 아래 함수를 호출한�
 - `run_plan` 이 `AppError` 를 던지면 (예: 데이터에 없는 월) `insight.status = "unsupported_question"`, `summary` 에 그 메시지를 담는다. 그 외 예외는 `llm_error` 로 표시하되 서버 로그에 `run_plan failed` 로 구분해 남긴다.
 - AI 단계(7·8)에서 어떤 예외가 나도 B 가 잡아 `insight.status = "llm_error"` 로 바꾸고 `kpis`/`comparison`/`rows`/`signals` 는 정상 반환한다.
 - `PlannerResult.status == "unsupported_question"` 이면 인사이트를 호출하지 않고 `insight.summary` 에 `reason` 을 담는다.
+- B 는 `create_analysis_plan` 에 업로드된 월 목록(`periods`, 오래된 월부터 `YYYY-MM`)을 넘긴다. planner 는 이것으로 "8월"·"지난달"·"이번 달" 같은 표현을 실제 월로 바꾼다.
+- B 는 `run_plan` 에 **스마트스토어 행을 포함한 전체 정규화 df** 를 넘긴다 (`kpis`·`comparison`·`signals` 는 스마트스토어 행을 뺀 df). 지표별로 어떤 행을 쓸지는 `run_plan` 이 정한다 (1장).
+- `AnalysisPlan.metric` 허용값 (`ai/models.py` 의 `Metric` 이 기준):
+
+  | 구분 | 값 |
+  |---|---|
+  | 기본 | `revenue`, `orders`, `units`, `ad_spend`, `ad_revenue`, `roas` |
+  | 기본 전월 대비 | `revenue_change`, `orders_change`, `units_change`, `ad_spend_change`, `ad_revenue_change` (%), `roas_change_pp` (%p) |
+  | 스마트스토어 | `visits`, `gross_revenue`, `aov`, `conversion_rate`, `refund_rate`, `discount_rate` |
+  | 스마트스토어 전월 대비 | `visits_change`, `gross_revenue_change`, `aov_change` (%), `conversion_rate_change_pp`, `refund_rate_change_pp`, `discount_rate_change_pp` (%p) |
+
+- `run_plan` 이 던지는 아래 코드는 **HTTP 오류 응답이 아니다.** B 가 잡아 `insight.status = "unsupported_question"`, `insight.summary` = 메시지로 내보낸다 (2장 오류 표에 넣지 않는다).
+
+  | 코드 | 언제 |
+  |---|---|
+  | `PERIOD_NOT_FOUND` | 계획의 `period` 가 업로드한 월에 없음 |
+  | `PREVIOUS_PERIOD_NOT_FOUND` | 전월 대비 지표인데 **달력상 전월**(2026-01 → 2025-12) 자료가 없음 |
+  | `UNSUPPORTED_PLAN` | 전월 대비 지표를 `group_by="period"` 로 묶음 |
+  | `STORE_DATA_NOT_FOUND` | 스마트스토어 지표인데 스마트스토어 판매 파일이 없음 |
 
 ## 4. 환경변수
 
@@ -132,3 +151,18 @@ B 의 `routers/preview.py`, `routers/analyze.py` 가 아래 함수를 호출한�
 - 답 행의 키: 그룹 키 + 지표 이름. `platform` → `{platform, <metric>}`, `period` → `{period, <metric>}`, `product` → `{product_id, product_name, <metric>}` (두 플랫폼 합산), `group_by` 없음 → `{<metric>}`.
 - 지표 값이 `null` (ROAS 분모 0) 인 그룹은 정렬 방향과 상관없이 맨 뒤. 동률은 그룹 키 순.
 - 업로드된 데이터에 없는 월은 `AppError("PERIOD_NOT_FOUND", …, 422, {period, available})` 를 던진다. 메시지는 사용자에게 그대로 보여도 되는 문구다 (`summary` 로 나간다).
+
+*행 범위 (`_scope`)* — `run_plan` 은 스마트스토어 행을 포함한 전체 df 를 받고, 지표에 따라 쓸 행을 고른다. "최신 월"·`available` 도 이렇게 고른 행 기준이다.
+
+| 지표 | 쓰는 행 |
+|---|---|
+| 기본 지표, 기본 전월 대비 | 쿠팡·네이버 행 (`kpis` 와 같은 규칙). 스마트스토어 파일만 올려 이 행이 하나도 없으면 스마트스토어 행 |
+| 스마트스토어 지표, 스마트스토어 전월 대비 | `naver_store` 행만. 없으면 `STORE_DATA_NOT_FOUND` |
+
+*전월 대비 지표 (`*_change`, `*_change_pp`)*
+- 기준 월은 `period` (`null` 이면 위 범위 안의 최신 월), 비교 월은 **달력상 앞달**이다 (2026-01 → 2025-12). `kpis`·`store` 의 비교 월과 같은 규칙이다 (위 "KPI·비교" 참고). 앞달 자료가 없으면 더 오래된 월로 대신하지 않고 `PREVIOUS_PERIOD_NOT_FOUND` 를 던진다.
+- 금액·건수는 증감률(%), `roas`·`conversion_rate`·`refund_rate`·`discount_rate` 는 증감(%p) 이다. 둘 다 소수 첫째 자리 반올림이고, %p 는 반올림 전 값끼리 뺀다. 지표 이름 대응은 3장 표 참고.
+- 답 행의 키: 그룹 키 + `{원 지표}_previous` + `{원 지표}` + `{증감 지표}`. 예: `{platform, roas_previous, roas, roas_change_pp}`, `group_by` 없음 → `{revenue_previous, revenue, revenue_change}`. 전월에 없던 그룹(예: 새 상품)의 `{원 지표}_previous` 는 합계 지표(`revenue`·`orders`·`units`·`ad_spend`·`ad_revenue`·`visits`·`gross_revenue`)는 0, 분모가 0이라 계산할 수 없는 지표(`roas`·`aov`·`conversion_rate`·`refund_rate`·`discount_rate`)는 `null` 이다. 두 경우 모두 증감은 `null`.
+- `group_by` 는 `platform`·`product`·없음만 된다. `period` 로 묶으면 `UNSUPPORTED_PLAN` (월별 변화는 `trend` 나 기본 지표의 `group_by="period"` 로 본다).
+- 증감 값이 `null` (전월 값 0, ROAS·전환율 분모 0) 인 그룹은 정렬 방향과 상관없이 맨 뒤. 동률은 그룹 키 순. `sort`·`limit` 기본값은 위 표와 같다.
+- 오류는 `STORE_DATA_NOT_FOUND` → `UNSUPPORTED_PLAN` → `PERIOD_NOT_FOUND` → `PREVIOUS_PERIOD_NOT_FOUND` 순으로 검사한다. 모두 HTTP 오류가 아니라 `unsupported_question` 의 `summary` 로 나간다 (3장).

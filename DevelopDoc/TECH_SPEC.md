@@ -153,7 +153,8 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 - 판별: 컬럼에 `채널상품번호`, `채널상품명`, `판매금액(총)` 이 모두 있으면 스토어 판매 파일이다.
 - 매핑: `revenue`=판매금액(순), `orders`=상품결제건수, `units`=결제상품수량. `ad_spend`·`ad_revenue` 는 0. 추가 지표 `gross_revenue`(판매금액(총)), `visits`(방문수), `refund_count`, `refund_amount`, `discount_amount`(전체 할인액) 는 스토어 행에만 값이 있다 (그 외 행은 응답에서 필드 자체가 빠진다).
 - 기간: 행의 `날짜` 범위 중간이 속한 월, 없으면 파일명. 일자별 행은 월·상품별로 합친다.
-- **`kpis`·`comparison`·`signals`·질문 실행(`run_plan`)은 `naver_store` 행을 제외하고 계산**한다. `rows` 와 `store` 에만 나온다. 스토어 파일만 올리면 제외할 행이 없으므로 그 행으로 계산한다.
+- **`kpis`·`comparison`·`signals` 는 `naver_store` 행을 제외하고 계산**한다. 스토어 파일만 올리면 제외할 행이 없으므로 그 행으로 계산한다.
+- 질문 실행(`run_plan`)은 지표별로 정한다: 기본 지표와 그 증감은 광고 리포트가 있으면 `naver_store` 행을 빼고, 스마트스토어 지표(`visits`·`gross_revenue`·`aov`·`conversion_rate`·`refund_rate`·`discount_rate` 와 그 증감)는 `naver_store` 행만 쓴다 (없으면 `STORE_DATA_NOT_FOUND` → `unsupported_question`). 상세는 `shared/contracts/README.md` 3장.
 - `store` (응답 최상위, 스토어 파일이 없으면 `null`): 스토어 데이터의 최신 월·달력상 앞달 기준(앞달 자료가 없으면 `previous`/`change` 는 `null`) `current`/`previous`/`change`(퍼널·환불률·할인율·객단가), 상품별 `products`(최대 10개), `trend`.
 - 방문·검색어·고객 분석 파일은 아직 지원하지 않으며 `UNSUPPORTED_DATASET` 오류를 낸다 (P1).
 
@@ -350,8 +351,8 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 - Pydantic 모델 `AnalysisPlan` 으로 검증, 허용되지 않은 값은 `unsupported_question`
 - LLM은 계획만 만들고, 실행은 `analysis/compare.run_plan(df, plan)` 이 수행
 - 질문의 명시적 지표·분류·정렬·개수·연월과 생성 계획을 대조한다. 현재 계약으로 표현할 수 없는 조건은 생략하거나 임의 축소하지 않고 `unsupported_question`으로 안내한다. 모델의 내부 `unrepresented_constraints`도 확인하며 공개 `AnalysisPlan` 계약은 변경하지 않는다.
-- `Metric` 24개 허용값은 `ai/models.py`가 기준이다. #23의 기본/스토어 지표와 각 전월 대비를 지원하며 C가 계산한다. 월별 증감 묶기·특정 상품/플랫폼 필터·복수 지표·기간 범위·원인 질문은 미지원이다.
-- `create_analysis_plan(question, periods=...)`의 업로드 월로 연도 없는 월/이번 달/지난달을 해석한다. 지난달은 최신 업로드 월의 달력상 앞달이며 누락된 월을 다른 월로 대체하지 않는다. 여러 연도의 같은 월은 모호하므로 YYYY-MM을 요청한다. 지표별 실제 데이터 가용성은 C `run_plan`이 확인한다.
+- `metric` 전체 허용값 24개(기본 6개 + 전월 대비 6개 + 스마트스토어 6개 + 스마트스토어 전월 대비 6개)는 `shared/contracts/README.md` 3장, 기준 코드는 `ai/models.py`의 `Metric`이다. C가 계산하며 월별 증감 묶기·특정 상품/플랫폼 필터·복수 지표·기간 범위·원인 질문은 미지원이다.
+- `create_analysis_plan(question, periods=...)`: B가 업로드된 월 목록을 넘기고 planner는 연도 없는 월/이번 달/지난달을 실제 `YYYY-MM`으로 해석한다. 지난달은 최신 업로드 월의 달력상 앞달이며 업로드하지 않은 월을 최신/다른 월로 대체하지 않는다. 여러 연도의 같은 월은 모호하므로 YYYY-MM을 요청한다. 지표별 실제 데이터 가용성은 C `run_plan`이 확인한다.
 
 ### 8-2. Insight — 계산 결과 → 설명
 
