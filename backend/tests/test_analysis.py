@@ -216,7 +216,7 @@ def test_year_boundary_previous_month_is_december():
 
 @pytest.mark.parametrize(
     ("period", "expected"),
-    [("2026-09", "2026-08"), ("2026-01", "2025-12"), ("2026-10", "2026-09"), ("2000-01", "1999-12")],
+    [("2026-09", "2026-08"), ("2026-01", "2025-12"), ("2026-10", "2026-09"), ("2026-12", "2026-11"), ("2000-01", "1999-12")],
 )
 def test_previous_calendar_month(period, expected):
     assert kpi.previous_calendar_month(period) == expected

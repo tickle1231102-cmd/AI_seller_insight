@@ -196,7 +196,3 @@ def test_change_january_without_december():
         compare.run_plan(df, plan(metric="revenue_change"))
     assert exc.value.details["previous_period"] == "2025-12"
 
-
-@pytest.mark.parametrize(("period", "expected"), [("2026-09", "2026-08"), ("2026-01", "2025-12"), ("2026-12", "2026-11")])
-def test_previous_month(period, expected):
-    assert compare._previous_month(period) == expected
