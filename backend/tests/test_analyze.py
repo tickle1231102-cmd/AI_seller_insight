@@ -184,3 +184,27 @@ def test_run_plan_bug_logged_separately(fake_analysis, monkeypatch, caplog):
     assert_analysis_ok(res.json())
     assert res.json()["insight"]["status"] == "llm_error"
     assert "run_plan failed" in caplog.text
+
+
+class ChattyAI(FakeAI):
+    def create_conversation_reply(self, question, kpis, comparison, signals, *, reason=None):
+        return {"status": "ok", "summary": "안녕하세요! 업로드한 자료로 매출과 광고 성과를 볼 수 있어요.",
+                "actions": ["이렇게 물어볼 수 있어요: “플랫폼별 ROAS 비교해줘”"], "limitations": [reason]}
+
+
+def test_unsupported_question_gets_conversational_reply(fake_analysis, monkeypatch):
+    ai = use_ai(monkeypatch, ChattyAI(plan_status="unsupported_question"))
+    body = client.post("/api/analyze", files=FILES, data={"question": "안녕?"}).json()
+    assert_analysis_ok(body)
+    assert body["insight"]["status"] == "ok" and body["insight"]["plan"] is None
+    assert body["insight"]["summary"].startswith("안녕하세요")
+    assert ai.insight_calls == []
+
+
+def test_conversation_failure_keeps_unsupported(fake_analysis, monkeypatch):
+    class Broken(ChattyAI):
+        def create_conversation_reply(self, *a, **k):
+            raise RuntimeError("boom")
+    use_ai(monkeypatch, Broken(plan_status="unsupported_question"))
+    body = client.post("/api/analyze", files=FILES, data={"question": "안녕?"}).json()
+    assert body["insight"]["status"] == "unsupported_question"

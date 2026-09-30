@@ -31,6 +31,19 @@ def _dump(value: Any) -> Any:
     return value.model_dump() if hasattr(value, "model_dump") else value
 
 
+def _converse(ai, question: str, kpis: dict, comparison: dict, sigs: list[dict], reason: str | None):
+    """계획으로 바꿀 수 없는 질문에 자연스럽게 답한다. 실패하면 None → 기존 안내로 돌아간다."""
+    reply_fn = getattr(ai, "create_conversation_reply", None)
+    if reply_fn is None:
+        return None
+    try:
+        result = reply_fn(question, kpis, comparison, sigs, reason=reason)  # D
+        return Insight.model_validate(_dump(result)) if result is not None else None
+    except Exception:
+        logger.exception("conversation fallback failed")
+        return None
+
+
 def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | None) -> Insight:
     """TECH_SPEC 1장 7·8단계. 예외를 밖으로 내보내지 않는다."""
     try:
@@ -41,7 +54,8 @@ def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | 
             periods = sorted(df["period"].unique())
             plan_result = ai.create_analysis_plan(question, periods=periods)  # D
             if plan_result.status == "unsupported_question":
-                return Insight(status="unsupported_question", summary=plan_result.reason or "")
+                chat = _converse(ai, question, kpis, comparison, sigs, plan_result.reason)
+                return chat or Insight(status="unsupported_question", summary=plan_result.reason or "")
             if plan_result.status != "ok":
                 logger.warning("planner failed: %s", plan_result.reason)
                 return Insight(status="llm_error")
