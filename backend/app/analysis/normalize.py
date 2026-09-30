@@ -230,9 +230,12 @@ def _parse(filename: str, content: bytes) -> _Parsed:
     product_ids, product_names = df[id_column].tolist(), df[name_column].tolist()
     if field_map is SMARTSTORE_SALES_MAP:
         # 내보내기에는 기간·일자별 '전체' 요약 행이 상품 행과 섞여 있다. 그대로 더하면 매출이 여러 배가 되므로
-        # 상품 행이 있으면 요약 행은 뺀다 (오류 행 번호는 파일 기준을 유지하려고 숫자 검증 뒤에 거른다).
-        keep = [i for i, (pid, name) in enumerate(zip(product_ids, product_names)) if SMARTSTORE_TOTAL_LABEL not in (pid, name)]
-        if keep and len(keep) < len(product_ids):
+        # 같은 월에 상품 행이 있을 때만 그 월의 요약 행을 뺀다. 상품 행이 없는 월의 요약 행은 대체할 데이터가 없으니 남긴다.
+        # (오류 행 번호는 파일 기준을 유지하려고 숫자 검증 뒤에 거른다.)
+        is_total = [SMARTSTORE_TOTAL_LABEL in (pid, name) for pid, name in zip(product_ids, product_names)]
+        periods_with_products = {p for p, total in zip(periods, is_total) if not total}
+        keep = [i for i, total in enumerate(is_total) if not total or periods[i] not in periods_with_products]
+        if len(keep) < len(product_ids):
             periods = [periods[i] for i in keep]
             product_ids = [product_ids[i] for i in keep]
             product_names = [product_names[i] for i in keep]
