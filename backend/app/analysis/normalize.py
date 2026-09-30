@@ -99,6 +99,13 @@ def _read_table(filename: str, content: bytes) -> pd.DataFrame:
             df = pd.read_csv(io.StringIO(_decode(content)), dtype=str, keep_default_na=False)
     except pd.errors.EmptyDataError:
         df = pd.DataFrame()
+    except Exception:  # 깨진 xlsx(zip 아님), 인코딩 불명, 표 형식이 아닌 CSV 등 — 500 대신 파일 문제로 알린다
+        raise AppError(
+            "UNREADABLE_FILE",
+            f"{filename}: 파일을 읽을 수 없습니다. 파일이 손상되지 않았는지, 엑셀 또는 CSV 형식이 맞는지 확인해주세요.",
+            422,
+            {"file": filename},
+        ) from None
 
     df.columns = [str(c).strip() for c in df.columns]
     df = df.map(lambda v: str(v).strip())

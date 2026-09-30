@@ -218,6 +218,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | `FILE_TOO_LARGE` | 413 | 파일 크기 초과 |
 | `UNSUPPORTED_FILE_TYPE` | 400 | 허용되지 않은 확장자 |
 | `EMPTY_FILE` | 422 | 데이터 행 없음 |
+| `UNREADABLE_FILE` | 422 | 파일을 표로 읽을 수 없음 (손상된 xlsx, 해독할 수 없는 인코딩 등) |
 | `MISSING_COLUMNS` | 422 | 필수 컬럼 누락 |
 | `INVALID_NUMBER` | 422 | 숫자 변환 실패 |
 | `UNKNOWN_PLATFORM` | 422 | 플랫폼 판별 불가 |

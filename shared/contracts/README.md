@@ -57,6 +57,7 @@
 | `FILE_TOO_LARGE` | 413 | `file`, `max_mb` |
 | `UNSUPPORTED_FILE_TYPE` | 400 | `file` |
 | `EMPTY_FILE` | 422 | `file` |
+| `UNREADABLE_FILE` | 422 | `file` (손상된 xlsx, 해독할 수 없는 인코딩 등 표로 읽을 수 없는 파일) |
 | `MISSING_COLUMNS` | 422 | `file`, `missing` |
 | `INVALID_NUMBER` | 422 | `file`, `row`, `column`, `value` (`row` 는 헤더를 뺀 데이터 행 기준 1부터) |
 | `UNKNOWN_PLATFORM` | 422 | `file` |
