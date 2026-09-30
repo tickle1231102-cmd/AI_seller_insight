@@ -31,16 +31,16 @@ def _dump(value: Any) -> Any:
     return value.model_dump() if hasattr(value, "model_dump") else value
 
 
-def _converse(ai, question: str, kpis: dict, comparison: dict, sigs: list[dict], reason: str | None):
-    """계획으로 바꿀 수 없는 질문에 자연스럽게 답한다. 실패하면 None → 기존 안내로 돌아간다."""
-    reply_fn = getattr(ai, "create_conversation_reply", None)
+def _small_talk(ai, question: str, has_store: bool):
+    """인사·기능 안내는 planner 를 부르지 않고 서버 고정 문구로 답한다. 실패하면 None → 기존 흐름."""
+    reply_fn = getattr(ai, "create_small_talk_reply", None)
     if reply_fn is None:
         return None
     try:
-        result = reply_fn(question, kpis, comparison, sigs, reason=reason)  # D
+        result = reply_fn(question, has_store=has_store)  # D
         return Insight.model_validate(_dump(result)) if result is not None else None
     except Exception:
-        logger.exception("conversation fallback failed")
+        logger.exception("small talk reply failed")
         return None
 
 
@@ -51,11 +51,13 @@ def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | 
         plan, answer = None, None
 
         if question:
+            chat = _small_talk(ai, question, has_store=bool((df["platform"] == normalize.STORE_PLATFORM).any()))
+            if chat is not None:
+                return chat
             periods = sorted(df["period"].unique())
             plan_result = ai.create_analysis_plan(question, periods=periods)  # D
             if plan_result.status == "unsupported_question":
-                chat = _converse(ai, question, kpis, comparison, sigs, plan_result.reason)
-                return chat or Insight(status="unsupported_question", summary=plan_result.reason or "")
+                return Insight(status="unsupported_question", summary=plan_result.reason or "")
             if plan_result.status != "ok":
                 logger.warning("planner failed: %s", plan_result.reason)
                 return Insight(status="llm_error")

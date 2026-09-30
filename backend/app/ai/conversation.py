@@ -1,78 +1,56 @@
-"""Conversational fallback for questions the planner cannot turn into a plan.
+"""Server-fixed replies for greetings and "what can you do?" messages.
 
-The planner stays strict. When it rejects a question (greeting, "why?",
-advice, follow-up), this module lets the model answer naturally using the
-already-computed KPI results as context. Numbers are never recalculated here:
-any number in the reply must already appear in the input, otherwise the
-caller falls back to the original unsupported_question response.
+These messages are not analysis questions, so they skip the planner LLM call
+and get a friendly fixed reply instead of the generic rejection. Status stays
+unsupported_question (no analysis plan), so the response contract is unchanged.
+Anything that mentions data (지표·플랫폼·상품·기간) is left to the planner.
 """
 from __future__ import annotations
 
-import json
 import re
-from collections.abc import Mapping, Sequence
-from typing import Any
 
-from pydantic import BaseModel, Field, ValidationError
-
-from .client import LLMClientError, OpenAIStructuredClient
 from .models import Insight
-from .prompts import CONVERSATION_INSTRUCTIONS
 
-NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
+DATA_WORDS = re.compile(
+    r"매출|주문|판매|수량|광고|roas|로아스|상품|플랫폼|네이버|쿠팡|스토어|방문|전환|환불|할인|객단가|"
+    r"결제|비용|수익|성과|효율|\d|월|주|분기|년|지난|이번|최근|왜|이유|원인",
+    re.IGNORECASE)
+GREETING = re.compile(r"^(안녕|하이|헬로|hello|hi|hey|반가|좋은 ?(아침|하루|저녁))", re.IGNORECASE)
+THANKS = re.compile(r"(고마|감사|thank|땡큐)", re.IGNORECASE)
+HELP = re.compile(
+    r"(뭐|무엇|무슨|어떤).{0,6}(할 ?수|해 ?줄 ?수|가능|기능|물어|질문)|"
+    r"(어떻게|어케).{0,4}(써|사용|쓰)|사용법|도움말|help|(너|넌|당신).{0,3}(누구|뭐야|뭐니)",
+    re.IGNORECASE)
 
-
-class ConversationReply(BaseModel):
-    reply: str
-    suggested_questions: list[str] = Field(max_length=3)
-
-
-def _numbers(text: str) -> set[str]:
-    found = set()
-    for raw in NUMBER.findall(text):
-        value = raw.replace(",", "")
-        found.add(value)
-        found.add(value.lstrip("0") or "0")  # "2026-08" 의 08 → "8월"
-        if "." in value:
-            found.add(value.rstrip("0").rstrip("."))
-    return found
-
-
-def _grounded(text: str, context: str) -> bool:
-    allowed = _numbers(context)
-    return all(n in allowed for n in _numbers(text))
+CAPABILITIES = (
+    "업로드하신 자료로 매출·주문 수·판매 수량·광고비·광고 전환매출·ROAS를 "
+    "플랫폼별·상품별·월별로 비교하고, 전월 대비 얼마나 늘거나 줄었는지 알려드릴 수 있어요."
+)
+STORE_CAPABILITIES = " 스마트스토어 판매 분석 파일이 있으면 방문수·구매전환율·환불률도 볼 수 있어요."
+REPLIES = {
+    "greeting": "안녕하세요! 판매·광고 데이터를 함께 살펴보는 AI 어시스턴트예요. ",
+    "thanks": "도움이 되었다니 다행이에요. 더 궁금한 점이 있으면 편하게 물어봐 주세요. ",
+    "help": "",
+}
 
 
-def create_conversation_reply(
-    question: str, kpis: Mapping[str, Any], comparison: Mapping[str, Any],
-    signals: Sequence[Mapping[str, Any]], *, reason: str | None = None,
-    llm: Any | None = None,
-) -> Insight | None:
-    """Return a natural reply, or None so the caller keeps its old response."""
-    context = json.dumps(
-        {"kpis": kpis, "comparison": comparison, "signals": list(signals)},
-        ensure_ascii=False, default=str)
-    payload = json.dumps(
-        {"question": question, "planner_reason": reason, "data": json.loads(context)},
-        ensure_ascii=False, default=str)
-    generator = llm or OpenAIStructuredClient()
-    try:
-        raw = generator.generate_structured(
-            schema=ConversationReply, instructions=CONVERSATION_INSTRUCTIONS,
-            input_text=payload, max_output_tokens=700)
-        reply = ConversationReply.model_validate(
-            raw.model_dump() if isinstance(raw, BaseModel) else raw)
-    except (LLMClientError, ValidationError, TypeError, ValueError):
+def small_talk_kind(question: str) -> str | None:
+    text = question.strip()
+    if not text or len(text) > 40 or DATA_WORDS.search(text):
         return None
+    if HELP.search(text):
+        return "help"
+    if GREETING.search(text):
+        return "greeting"
+    if THANKS.search(text):
+        return "thanks"
+    return None
 
-    text = reply.reply.strip()
-    # 사용자가 질문에 쓴 숫자(예: "3개")는 그대로 되풀이해도 된다.
-    if not text or not _grounded(text, context + " " + question):
+
+def create_small_talk_reply(question: str, *, has_store: bool = False) -> Insight | None:
+    """Fixed reply for greeting/thanks/help messages, or None for everything else."""
+    kind = small_talk_kind(question)
+    if kind is None:
         return None
-    suggestions = [q.strip() for q in reply.suggested_questions if q.strip()]
-    return Insight(
-        status="ok",
-        summary=text,
-        actions=[f"이렇게 물어볼 수 있어요: “{q}”" for q in suggestions],
-        limitations=[reason] if reason else [],
-    )
+    capabilities = CAPABILITIES + (STORE_CAPABILITIES if has_store else "")
+    return Insight(status="unsupported_question", summary=REPLIES[kind] + capabilities)
