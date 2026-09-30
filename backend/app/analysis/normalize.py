@@ -45,6 +45,7 @@ SMARTSTORE_SALES_MAP: dict[str, str] = {
 SMARTSTORE_ID_COLUMN = "채널상품번호"
 SMARTSTORE_NAME_COLUMN = "채널상품명"
 SMARTSTORE_DATE_COLUMN = "날짜"
+SMARTSTORE_TOTAL_LABEL = "전체"  # 기간·일자 합계 행의 상품명·상품번호 값
 # 스마트스토어 판매 분석은 광고 리포트(naver)와 같은 판매액이 겹칠 수 있어 별도 platform 으로 분리한다.
 # kpis·comparison·신호·질문 실행은 이 platform 을 제외하고 계산하고, store 섹션과 rows 에만 나온다.
 STORE_PLATFORM = "naver_store"
@@ -226,7 +227,18 @@ def _parse(filename: str, content: bytes) -> _Parsed:
                     {"file": filename, "row": row_no, "column": column, "value": record[column]},
                 ) from None
 
-    return _Parsed(platform, periods, field_map, df[id_column].tolist(), df[name_column].tolist(), metrics)
+    product_ids, product_names = df[id_column].tolist(), df[name_column].tolist()
+    if field_map is SMARTSTORE_SALES_MAP:
+        # 내보내기에는 기간·일자별 '전체' 요약 행이 상품 행과 섞여 있다. 그대로 더하면 매출이 여러 배가 되므로
+        # 상품 행이 있으면 요약 행은 뺀다 (오류 행 번호는 파일 기준을 유지하려고 숫자 검증 뒤에 거른다).
+        keep = [i for i, (pid, name) in enumerate(zip(product_ids, product_names)) if SMARTSTORE_TOTAL_LABEL not in (pid, name)]
+        if keep and len(keep) < len(product_ids):
+            periods = [periods[i] for i in keep]
+            product_ids = [product_ids[i] for i in keep]
+            product_names = [product_names[i] for i in keep]
+            metrics = {c: [values[i] for i in keep] for c, values in metrics.items()}
+
+    return _Parsed(platform, periods, field_map, product_ids, product_names, metrics)
 
 
 def preview_file(filename: str, content: bytes) -> dict:
