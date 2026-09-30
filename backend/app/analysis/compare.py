@@ -6,7 +6,7 @@
 from typing import Any
 
 from app.analysis.kpi import STORE_SUM_FIELDS, _pct_change, _ratio, raw_roas, store_totals, totals
-from app.analysis.normalize import STORE_PLATFORM
+from app.analysis.normalize import STORE_PLATFORM, core_rows
 from app.core.errors import AppError
 
 DEFAULT_LIMIT = 5
@@ -40,12 +40,11 @@ _RAW_RATES = {
 def _scope(df, base: str):
     """지표에 맞는 행만 남긴다.
 
-    스마트스토어 지표면 스마트스토어 행만 (없으면 AppError). 그 외 지표는 routers/analyze.py 의 kpis 와 같은 규칙으로,
-    광고 리포트(쿠팡·네이버)가 함께 있으면 판매액이 겹칠 수 있는 스마트스토어 행을 뺀다.
+    스마트스토어 지표면 스마트스토어 행만 (없으면 AppError). 그 외 지표는 routers/analyze.py 의 kpis 와 같은 규칙
+    (normalize.core_rows) 으로 판매액이 겹치는 스마트스토어 행을 빼거나 naver 로 합친다.
     """
     if base not in STORE_METRICS:
-        core = df[df["platform"] != STORE_PLATFORM]
-        return df if core.empty else core
+        return core_rows(df)
     store = df[df["platform"] == STORE_PLATFORM]
     if store.empty:
         raise AppError(
