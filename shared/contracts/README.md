@@ -160,9 +160,9 @@ B 의 `routers/preview.py`, `routers/analyze.py` 가 아래 함수를 호출한�
 | 스마트스토어 지표, 스마트스토어 전월 대비 | `naver_store` 행만. 없으면 `STORE_DATA_NOT_FOUND` |
 
 *전월 대비 지표 (`*_change`, `*_change_pp`)*
-- 기준 월은 `period` (`null` 이면 위 범위 안의 최신 월), 비교 월은 **달력상 앞달**이다 (2026-01 → 2025-12). `kpis` 의 비교 규칙과 같고, 앞달 자료가 없으면 더 오래된 월로 대신하지 않고 `PREVIOUS_PERIOD_NOT_FOUND` 를 던진다.
+- 기준 월은 `period` (`null` 이면 위 범위 안의 최신 월), 비교 월은 **달력상 앞달**이다 (2026-01 → 2025-12). `kpis` 의 비교 월도 #27 병합 후에는 같은 규칙이다 (병합 전 `main` 의 `kpis` 는 직전 업로드 월). 앞달 자료가 없으면 더 오래된 월로 대신하지 않고 `PREVIOUS_PERIOD_NOT_FOUND` 를 던진다.
 - 금액·건수는 증감률(%), `roas`·`conversion_rate`·`refund_rate`·`discount_rate` 는 증감(%p) 이다. 둘 다 소수 첫째 자리 반올림이고, %p 는 반올림 전 값끼리 뺀다. 지표 이름 대응은 3장 표 참고.
-- 답 행의 키: 그룹 키 + `{원 지표}_previous` + `{원 지표}` + `{증감 지표}`. 예: `{platform, roas_previous, roas, roas_change_pp}`, `group_by` 없음 → `{revenue_previous, revenue, revenue_change}`. 전월 값이 없던 그룹(전월에 없던 상품)은 `_previous` 가 0 이다.
+- 답 행의 키: 그룹 키 + `{원 지표}_previous` + `{원 지표}` + `{증감 지표}`. 예: `{platform, roas_previous, roas, roas_change_pp}`, `group_by` 없음 → `{revenue_previous, revenue, revenue_change}`. 전월에 없던 그룹(예: 새 상품)의 `{원 지표}_previous` 는 합계 지표(`revenue`·`orders`·`units`·`ad_spend`·`ad_revenue`·`visits`·`gross_revenue`)는 0, 분모가 0이라 계산할 수 없는 지표(`roas`·`aov`·`conversion_rate`·`refund_rate`·`discount_rate`)는 `null` 이다. 두 경우 모두 증감은 `null`.
 - `group_by` 는 `platform`·`product`·없음만 된다. `period` 로 묶으면 `UNSUPPORTED_PLAN` (월별 변화는 `trend` 나 기본 지표의 `group_by="period"` 로 본다).
 - 증감 값이 `null` (전월 값 0, ROAS·전환율 분모 0) 인 그룹은 정렬 방향과 상관없이 맨 뒤. 동률은 그룹 키 순. `sort`·`limit` 기본값은 위 표와 같다.
 - 오류는 `STORE_DATA_NOT_FOUND` → `UNSUPPORTED_PLAN` → `PERIOD_NOT_FOUND` → `PREVIOUS_PERIOD_NOT_FOUND` 순으로 검사한다. 모두 HTTP 오류가 아니라 `unsupported_question` 의 `summary` 로 나간다 (3장).
