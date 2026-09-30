@@ -161,14 +161,14 @@
 ### WU-AI-01 LLM 클라이언트 · 실패 처리
 - **담당:** D · **리뷰:** A
 
-> #18 A 최종 승인/main ff214c2 병합 및 실제 main 비유료 493개 확인 후 D 서버 기능만 체크했다. #22 문서/opt-in 후속과 새 배포 UI/E2E는 별도 대기다. 실제 API 결과는 동일 AI 구현 29a90ea에서 실행한 기록이며 최신 단일 기준은 `D_WEDNESDAY_STATUS.md`다.
+> #18/#22 A 승인·병합 후 main f05ff2c 비유료493개를 확인하고 D 서버 기능만 체크했다. 새 배포 UI/E2E는 별도 대기다. 실제 API는 동일 AI 구현29a90ea의 기록이다. #34 대화형 fallback은 보완 요청으로 미병합이며 최신 단일 기준은 `D_WEDNESDAY_STATUS.md`다.
 
 **완료 조건**
 - [x] `ai/` 내 LLM 호출 함수가 API 키를 환경변수로만 읽음 (`OPENAI_API_KEY` 우선, `LLM_API_KEY` 호환; 실제 키는 커밋하지 않음)
 - [x] 호출 1회당 타임아웃 적용 (`LLM_TIMEOUT_SECONDS`, 기본 30초 — 최신 TECH_SPEC과 일치)
 - [x] JSON 파싱/검증 실패 시 1회 재시도 후 `llm_error` 반환 (`test_structured_client_retries_invalid_output_once`)
 - [x] API 키 없음·네트워크 오류 시 예외가 밖으로 새지 않고 `llm_error` 반환 (`test_missing_api_key_is_normalized`, `test_structured_client_normalizes_provider_failure`)
-- [x] 실패 경로를 모킹한 테스트 통과 (실제 main 493 passed/9 deselected, #22 통합 493 passed/10 deselected)
+- [x] 실패 경로를 모킹한 테스트 통과 (main f05ff2c 비유료493 passed/10 deselected)
 
 ### WU-AI-02 질문 → 분석 계획 JSON (Planner)
 - **담당:** D · **리뷰:** A
@@ -284,12 +284,12 @@
 - **담당:** D · **리뷰:** A
 
 **완료 조건**
-> #18 A 승인/main 반영 및 실제 main 품질 회귀 확인 완료. 최신 문서/활용 사례의 main 반영은 #22 A 리뷰·병합 대기다.
+> #18/#22 A 승인·병합 및 main 품질 회귀 확인 완료. 배포 UI/E2E는 별도이며 이번 완료 근거 문서 후속은 A 리뷰 대상이다.
 - [x] 인사이트 품질 테스트 최소 5개 이상 구성 (`test_insight_safety.py`, `test_insight_number_grounding.py`, `ai_quality_runner.py`의 실제 인사이트 9개 시나리오)
 - [x] 검증한 시나리오에서 사실 문장은 서버가 검증된 계산값으로 생성하고 호출자의 `plan`/`answer`를 보존 (숫자 변조 0건; 모든 임의 입력의 정확도 보장 아님)
 - [x] 광고 소재·CTR·CPC·CVR·경쟁사·시장 상황 등 입력에 없는 원인을 모델이 단정문으로 생성하는 경로 제거 (허용되지 않은 자유 문장/ID 차단)
 - [x] 필요한 추가 데이터와 현재 확인 불가 범위를 서버의 `limitations`에 기술 (단일 월, ROAS 계산 불가, 불연속 월, 신호 없음 포함)
-- [ ] 최신 테스트 결과와 AI 활용 사례를 `DevelopDoc/AI_RELIABILITY_IMPROVEMENTS.md`, `AI_INSIGHT_SAFETY_TEST_REPORT.md`, `AI_USAGE_CASES.md`에 기록하고 main 반영 (#22 준비 완료, A 리뷰·병합 대기)
+- [x] 테스트 결과와 AI 활용 사례를 `DevelopDoc/AI_RELIABILITY_IMPROVEMENTS.md`, `AI_INSIGHT_SAFETY_TEST_REPORT.md`, `AI_USAGE_CASES.md`에 기록하고 main 반영 (#18/#22 A 승인·병합 완료; 이번 완료 근거 갱신은 후속 PR)
 
 ### WU-DA-06 데이터 · 실패 케이스 QA
 - **담당:** C · **리뷰:** D
