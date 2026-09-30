@@ -146,3 +146,13 @@ def test_unreadable_file_is_reported_not_server_crash(endpoint, name, body):
     assert error["code"] == "UNREADABLE_FILE"
     assert name in error["message"]
     assert error["details"] == {"file": name}
+
+
+def test_unreadable_file_cause_is_logged_without_file_content(caplog):
+    secret = b"\x80\x81 SECRET-CELL-VALUE"
+    with caplog.at_level("WARNING", logger="app.analysis.normalize"):
+        client.post("/api/preview", files=[upload("coupang_2026-09.xlsx", secret)])
+    record = next(r for r in caplog.records if r.name == "app.analysis.normalize")
+    assert "coupang_2026-09.xlsx" in record.getMessage()
+    assert record.exc_info is not None  # 원인(예외)이 로그에 남는다
+    assert "SECRET-CELL-VALUE" not in record.getMessage()

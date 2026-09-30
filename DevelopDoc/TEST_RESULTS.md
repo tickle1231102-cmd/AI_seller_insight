@@ -8,8 +8,8 @@
 
 | 항목 | 결과 |
 |---|---|
-| `backend` 전체 `pytest` | 190 통과 · 1 건너뜀(`test_ai_live`, 실제 LLM 키가 있을 때만 실행) |
-| 이 브랜치가 추가한 테스트 | `tests/test_failure_cases.py` 31개 (실패 7종 × preview·analyze 양쪽, 경계값, 손상 파일, 일부 파일만 나쁜 경우) + `tests/test_smartstore.py` 5개 (`전체` 요약 행 처리, 월별 판단 포함) |
+| `backend` 전체 `pytest` | 191 통과 · 1 건너뜀(`test_ai_live`, 실제 LLM 키가 있을 때만 실행) |
+| 이 브랜치가 추가한 테스트 | `tests/test_failure_cases.py` 32개 (실패 7종 × preview·analyze 양쪽, 경계값, 손상 파일과 그 원인 로그, 일부 파일만 나쁜 경우) + `tests/test_smartstore.py` 5개 (`전체` 요약 행 처리, 월별 판단 포함) |
 
 ## 2. 실패 케이스 (WU-DA-06 완료 조건 1·2)
 

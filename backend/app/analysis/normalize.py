@@ -9,12 +9,15 @@ EMPTY_FILE → UNKNOWN_PLATFORM → MISSING_COLUMNS → INVALID_PERIOD → INVAL
 """
 
 import io
+import logging
 import re
 from dataclasses import dataclass
 
 import pandas as pd
 
 from app.core.errors import AppError
+
+logger = logging.getLogger(__name__)
 
 # TECH_SPEC 4-1. 공통 필드 ← 플랫폼 원본 컬럼. 새 플랫폼은 여기에 추가하면 된다.
 PLATFORM_COLUMN_MAP: dict[str, dict[str, str]] = {
@@ -101,6 +104,8 @@ def _read_table(filename: str, content: bytes) -> pd.DataFrame:
     except pd.errors.EmptyDataError:
         df = pd.DataFrame()
     except Exception:  # 깨진 xlsx(zip 아님), 인코딩 불명, 표 형식이 아닌 CSV 등 — 500 대신 파일 문제로 알린다
+        # 코드 버그도 여기로 올 수 있으니 원인은 서버 로그에 남긴다 (파일 내용은 남기지 않고 파일명만).
+        logger.warning("파일을 읽지 못했습니다: %s", filename, exc_info=True)
         raise AppError(
             "UNREADABLE_FILE",
             f"{filename}: 파일을 읽을 수 없습니다. 파일이 손상되지 않았는지, 엑셀 또는 CSV 형식이 맞는지 확인해주세요.",
