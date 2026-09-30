@@ -161,6 +161,8 @@
 ### WU-AI-01 LLM 클라이언트 · 실패 처리
 - **담당:** D · **리뷰:** A
 
+> D 체크 상태는 PR #18 + 후속 검증 브랜치에서 확인한 구현·테스트 결과를 병합 시 반영하기 위한 제안이다. A 승인·main 병합 전에는 팀 차원의 최종 완료로 확정하지 않는다. 배포 기존 코드 검증과 새 개선본의 배포 검증은 `D_WEDNESDAY_STATUS.md`에서 구분한다.
+
 **완료 조건**
 - [x] `ai/` 내 LLM 호출 함수가 API 키를 환경변수로만 읽음 (`OPENAI_API_KEY` 우선, `LLM_API_KEY` 호환; 실제 키는 커밋하지 않음)
 - [x] 호출 1회당 타임아웃 적용 (`LLM_TIMEOUT_SECONDS`, 기본 30초 — 최신 TECH_SPEC과 일치)
@@ -173,7 +175,7 @@
 
 **완료 조건**
 - [x] `planner.py` 가 질문 → `AnalysisPlan` (`metric`, `group_by`, `sort`, `limit`, `period`) 반환
-- [x] 허용 값 외 출력은 Pydantic 검증에서 걸러져 `unsupported_question`; 명시 조건 누락·임의 축소도 질문 정책과 `unrepresented_constraints`로 차단
+- [x] 허용 값 외 구조 출력은 Pydantic 검증·1회 재시도 후 `llm_error`; 현재 계약에 없는 질문 조건·명시 조건 누락·임의 축소는 질문 정책과 `unrepresented_constraints`로 `unsupported_question` 안내
 - [x] 테스트 질문 세트 30개 작성 (`backend/tests/ai_quality_cases.json`: 지원 15, 미지원 15)
 - [x] 실제 `gpt-6-luna` 테스트 질문 세트 30/30 통과(100%, 최소 기준 90% 이상)
   - 예: "광고 효율이 가장 안 좋은 플랫폼 어디야?" → `{"metric":"roas","group_by":"platform","sort":"asc"}`

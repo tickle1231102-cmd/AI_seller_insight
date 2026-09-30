@@ -53,7 +53,7 @@
 기존 버전 비교: `python -m backend.tests.ai_quality_runner --live --baseline 13844f1`
 실제 결과는 표준 출력 JSON으로만 제공한다. 토큰·비용을 무제한 사용하지 않도록 workers는 최대 3이다.
 
-## 다음 날 작업 사전 검증 (로컬 전용)
+## 9월 29일 다음 날 작업 사전 검증 기록
 
 - PR #18 위 로컬 브랜치 `prep/day3-d-ai-qa`에서 실행했으며 GitHub에는 게시하지 않았다.
 - 비유료 백엔드 전체: **351 passed, 3 deselected**. 새로 추가한 유료 실제 라우트 테스트가 기본 실행에서 제외되므로 deselected가 2개에서 3개로 늘었다.
@@ -61,7 +61,14 @@
 - 실제 인사이트 시나리오: **8개 status=ok**, 계산 결과 모순 1개는 API 호출 전 `llm_error(inconsistent_analysis_results)`로 차단. 9개 모두 입력과 호출자의 plan/answer를 보존했다.
 - 유료 통합 테스트 3개(Planner 10문항, 인사이트 smoke, 실제 `/api/analyze` 라우트)가 **3 passed**. 공개 fixture만 사용했고 실제 키는 출력·복사·커밋하지 않았다.
 - 첫 품질 실행은 샌드박스의 외부 네트워크 차단으로 공급자 오류가 발생해 제품 결과에서 제외했다. 네트워크 허용 상태에서 동일 테스트를 다시 실행한 위 결과만 유효한 최종 기록이다.
-- 내일 작업 순서와 외부 선행 조건은 `D_NEXT_DAY_CHECKLIST.md`에 분리했다.
+- 후속 작업 순서와 외부 선행 조건은 `D_NEXT_DAY_CHECKLIST.md`에서 갱신한다.
+
+## 9월 30일 D 수요일 검증
+
+- 동일 AI 코드의 비유료 회귀 재실행: **351 passed, 3 deselected**, 6.94초. 전날 실행 수와 합산하지 않는다. 오늘 고정 30문항 유료 평가를 다시 실행하지 않았으며 위 결과는 9월 29일 기록이다.
+- 배포 화면은 실제 Vercel → Render의 `/api/preview`, `/api/analyze` HTTP 200을 관찰했다. 공개 fixture의 매출 12,600,000원, ROAS 312.5%, 전월 ROAS 변화 −14.2%p와 질문 답 쿠팡 291.7%가 표시됐다. 데이터에 없는 광고 소재 원인 질문은 미지원 안내로 표시됐다.
+- 이 브라우저 탭의 `/api/analyze` 응답만 일시적으로 `insight.status=llm_error`로 모의했다. 실제 공개 fixture 계산 결과를 보존한 응답으로 KPI·차트가 남고 AI 영역에 오류·다시 시도가 표시되는지 확인했다. 모의 규칙은 해제하고 정상 요청을 재시도했다. Render 설정이나 키는 변경하지 않았다.
+- 현재 배포는 PR #18 개선본이 아니므로 해당 코드의 배포 완료/최종 E2E를 주장하지 않는다. D 수요일 검증과 외부 대기는 `D_WEDNESDAY_STATUS.md`에 분리한다.
 
 ## 17:17 메일 처리
 PR #16(`c326b14`)은 C의 WORK_UNITS DA-01~05 체크 상태 갱신이다.
