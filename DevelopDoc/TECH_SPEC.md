@@ -322,7 +322,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 
 ```json
 {
-  "metric": "revenue | orders | units | ad_spend | ad_revenue | roas",
+  "metric": "revenue | orders | units | ad_spend | ad_revenue | roas | <전월 대비·스마트스토어 지표>",
   "group_by": "platform | period | product | null",
   "sort": "asc | desc | null",
   "limit": 5,
@@ -333,6 +333,8 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 - Pydantic 모델 `AnalysisPlan` 으로 검증, 허용되지 않은 값은 `unsupported_question`
 - LLM은 계획만 만들고, 실행은 `analysis/compare.run_plan(df, plan)` 이 수행
 - 질문의 명시적 지표·분류·정렬·개수·연월과 생성 계획을 대조한다. 현재 계약으로 표현할 수 없는 조건은 생략하거나 임의 축소하지 않고 `unsupported_question`으로 안내한다. 모델의 내부 `unrepresented_constraints`도 확인하며 공개 `AnalysisPlan` 계약은 변경하지 않는다.
+- `Metric` 24개 허용값은 `ai/models.py`가 기준이다. #23의 기본/스토어 지표와 각 전월 대비를 지원하며 C가 계산한다. 월별 증감 묶기·특정 상품/플랫폼 필터·복수 지표·기간 범위·원인 질문은 미지원이다.
+- `create_analysis_plan(question, periods=...)`의 업로드 월로 연도 없는 월/이번 달/지난달을 해석한다. 지난달은 최신 업로드 월의 달력상 앞달이며 누락된 월을 다른 월로 대체하지 않는다. 여러 연도의 같은 월은 모호하므로 YYYY-MM을 요청한다. 지표별 실제 데이터 가용성은 C `run_plan`이 확인한다.
 
 ### 8-2. Insight — 계산 결과 → 설명
 
@@ -344,6 +346,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 - 같은 기간·대상·지표의 계산 결과가 서로 다르거나 질문의 계산 가능한 답이 없으면 API 호출 전 `unsupported_question`으로 처리한다. 계산 모순에는 원자료 확인 `summary`를 제공하며 반복 LLM 재시도를 권하지 않는다. 유효한 0과 결측값은 구분한다.
 - 점검·행동은 입력 데이터와 신호가 허용하는 문구만 사용한다. 업로드 데이터에 없는 원인을 단정하지 않고, 비교 기간 부재·계산 불가 ROAS·불연속 월·추가로 필요한 자료를 서버가 `limitations`에 안내한다.
 - 근거는 현재 계산 결과 경로를 가리키며 원본 엑셀 셀 추적을 의미하지 않는다. 잘못 계산된 입력을 전부 검산하거나 모든 자연어 조건을 완전히 이해한다고 보장하지 않는다. 평가 범위는 `AI_RELIABILITY_IMPROVEMENTS.md` 참고.
+- 24개 지표의 답 근거를 지원하고 증감의 %/%p 및 전월/현재 값을 구분한다. 스마트스토어 답에 기준 월이 없으면 광고 KPI의 월로 추정하지 않는다. 지원 입력은 팀 통합 템플릿·스마트스토어 SALES이며 원본 판매/광고 리포트 자동 병합은 미지원이다. 화면 표시 모드는 AI 입력 계약을 바꾸지 않는다 (#21/#29).
 
 ### 8-3. 실패 처리
 

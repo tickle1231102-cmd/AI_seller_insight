@@ -4,6 +4,7 @@ from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
 from typing import get_args
+import os
 
 import pytest
 from fastapi.testclient import TestClient
@@ -102,3 +103,35 @@ def test_missing_store_data_remains_explicit_and_preserves_core_kpis(monkeypatch
                            data={"question":"방문수"}).json()
     assert body["insight"]["status"] == "unsupported_question"
     assert "SALES" in body["insight"]["summary"] and body["kpis"]["current"]["revenue"] == 8000000
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(os.getenv("RUN_LLM_INTEGRATION") != "1", reason="Explicit paid API opt-in required")
+@pytest.mark.parametrize("question, metric", [
+    ("2026-09 전월 대비 매출", "revenue_change"),
+    ("2026-09 전월 대비 ROAS", "roas_change_pp"),
+    ("2026-09 방문수", "visits"),
+    ("2026-09 구매전환율", "conversion_rate"),
+    ("2026-09 환불률", "refund_rate"),
+    ("2026-09 할인율", "discount_rate"),
+    ("2026-09 객단가", "aov"),
+])
+def test_live_chat_extensions_preserve_exact_calculated_response(question, metric):
+    source = uploads()
+    df = normalize.normalize_files(source)
+    core = df[df["platform"] != normalize.STORE_PLATFORM]
+    with TestClient(app) as client:
+        response = client.post("/api/analyze", files=[("files",(n,b,"application/octet-stream")) for n,b in source],
+                               data={"question":question})
+    body = response.json()
+    insight = body["insight"]
+    assert response.status_code == 200 and insight["status"] == "ok"
+    plan = AnalysisPlan(**insight["plan"])
+    assert plan.metric == metric and plan.period == "2026-09" and plan.group_by is None
+    assert insight["answer"] == compare.run_plan(df, plan)
+    assert body["kpis"] == kpi.compute_kpis(core) and body["store"] == kpi.compute_store_kpis(df)
+    assert body["comparison"] == compare.build_comparison(core)
+    assert body["signals"] == signals.detect_signals(body["kpis"],body["comparison"])
+    catalogue = EvidenceCatalogue.build(body["kpis"],body["comparison"],body["signals"],plan,insight["answer"])
+    assert catalogue.facts[f"answer.0.{metric}"].text in insight["summary"]
+    assert insight["limitations"] and "reason" not in insight
