@@ -23,12 +23,22 @@ class StructuredGenerator(Protocol):
     ) -> TModel: ...
 
 
+def _planner_input(question: str, periods: list[str] | None) -> str:
+    if not periods:
+        return question
+    return f"Uploaded periods (oldest first): {', '.join(periods)}\nQuestion: {question}"
+
+
 def create_analysis_plan(
     question: str,
     *,
+    periods: list[str] | None = None,
     llm: StructuredGenerator | None = None,
 ) -> PlannerResult:
     """Convert a user question into a validated AnalysisPlan.
+
+    periods are the uploaded YYYY-MM months (oldest first). They let the model
+    resolve relative month words such as "8월", "지난달", "이번 달".
 
     This function never executes pandas calculations. It only produces the plan
     that C's analysis.compare.run_plan(df, plan) will execute.
@@ -52,7 +62,7 @@ def create_analysis_plan(
         decision = generator.generate_structured(
             schema=PlannerDecision,
             instructions=PLANNER_INSTRUCTIONS,
-            input_text=normalized,
+            input_text=_planner_input(normalized, periods),
             max_output_tokens=500,
         )
     except LLMClientError as exc:

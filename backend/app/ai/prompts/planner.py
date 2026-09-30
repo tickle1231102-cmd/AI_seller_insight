@@ -32,7 +32,12 @@ Rules:
    questions that require unavailable dimensions/metrics.
 3. Prefer sort="asc" for phrases such as "가장 낮은", "안 좋은", "적은".
 4. Prefer sort="desc" for phrases such as "가장 높은", "좋은", "많은".
-5. Use period only when the user explicitly names a YYYY-MM month.
+5. Set period only when the question names a month. Resolve it against the
+   "Uploaded periods" line when present: "8월" / "8월달" → the uploaded period
+   ending in -08; "이번 달" / "이번달" → the latest uploaded period;
+   "지난달" / "전월" → the period right before the latest. If the named month is
+   not uploaded, still return it as YYYY-MM (the year of the latest upload) so
+   the caller can explain it is missing. Otherwise leave period null.
 6. Use a requested top-N as limit; otherwise use 5.
 7. Do not infer CTR, CPC, CVR, ad creative quality, competitor prices, market
    conditions, or any other field outside the supported list.

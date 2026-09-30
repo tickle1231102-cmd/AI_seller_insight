@@ -38,7 +38,8 @@ def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | 
         plan, answer = None, None
 
         if question:
-            plan_result = ai.create_analysis_plan(question)  # D
+            periods = sorted(df["period"].unique())
+            plan_result = ai.create_analysis_plan(question, periods=periods)  # D
             if plan_result.status == "unsupported_question":
                 return Insight(status="unsupported_question", summary=plan_result.reason or "")
             if plan_result.status != "ok":
