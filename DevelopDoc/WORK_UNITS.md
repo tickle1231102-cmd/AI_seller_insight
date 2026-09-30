@@ -52,11 +52,11 @@
 - **내용:** 정규화 스키마 9개 필드, 플랫폼 컬럼 매핑, `/api/analyze` 응답 구조, 오류 코드 확정 후 `shared/contracts/` 에 기록
 
 **완료 조건**
-- [ ] `shared/contracts/` 에 공통 데이터 스키마(9개 필드, 타입, 단위) 문서화
-- [ ] 쿠팡·네이버 → 공통 필드 매핑 표 확정
-- [ ] `/api/preview`, `/api/analyze` 응답 JSON 예시 파일 커밋
-- [ ] 오류 코드 목록 확정
-- [ ] 4명 전원이 PR에 승인(Approve) 표시
+- [x] `shared/contracts/` 에 공통 데이터 스키마(9개 필드, 타입, 단위) 문서화 (`shared/contracts/README.md` 1장)
+- [x] 쿠팡·네이버 → 공통 필드 매핑 표 확정 (README 1장 "플랫폼 컬럼 매핑". ⚠️ 팀 정의 템플릿 기준 — 실제 쿠팡·네이버 광고 리포트는 컬럼 구조가 달라 미지원, PR #20 `TEST_RESULTS.md` 4장)
+- [x] `/api/preview`, `/api/analyze` 응답 JSON 예시 파일 커밋 (`preview_response.json`, `analyze_response.json`, `test_api.py` 에서 스키마 검증)
+- [x] 오류 코드 목록 확정 (README 2장. `UNREADABLE_FILE` 은 PR #20 에서 추가 예정)
+- [ ] 4명 전원이 PR에 승인(Approve) 표시 — ⏳ 계약을 바꾼 PR 중 4명 모두 승인한 PR 없음 (#6: C·D 승인, #9: B 승인, #17: 승인 없이 merge). 확정하려면 최종 계약 PR 에 전원 Approve 필요
 
 ### WU-COM-02 저장소 · 협업 환경 구성
 - **담당:** B · **리뷰:** A
@@ -299,10 +299,11 @@
 - **담당:** B · **리뷰:** C
 
 **완료 조건**
-- [x] Render 에 Backend 배포, 배포 URL `/health` 정상 (PR #12 `380104f` 까지 반영. Public Git Repository 연결이라 main 의 `backend/app/`·`requirements.txt` 변경이 merge 되면 **Render 에서 수동 재배포** 필요)
-- [ ] Render 환경변수(`LLM_API_KEY`, `LLM_MODEL`, `ALLOWED_ORIGINS`) 설정 — ⏳ `ALLOWED_ORIGINS` 만 설정됨. API 키 전달 대기
-- [ ] Vercel 에 Frontend 배포, `NEXT_PUBLIC_API_BASE_URL` 이 Render URL — ⏳ Vercel 배포는 됨. 환경변수가 비어 mock 모드 (A 설정 대기)
-- [ ] 배포된 Frontend 에서 CORS 오류 없이 `/api/analyze` 호출 성공 — ⏳ 백엔드 CORS 허용 완료. 위 Vercel 설정 후 확인
+- [x] Render 에 Backend 배포, 배포 URL `/health` 정상
+- [x] `main` 에 `backend/**` 변경이 merge 되면 자동 재배포 (PR #19, GitHub Actions → Render Deploy Hook). 9/30 수동 실행 성공 → Render Live 확인. 워크플로는 배포 '요청'만 하므로 빌드 성공은 Render Events 에서 확인
+- [x] Render 환경변수(API 키, `ALLOWED_ORIGINS`) 설정 — 9/30 API 키 등록, 배포 서버 `insight.status=ok` 확인. `LLM_MODEL` 을 넣지 않으면 기본값 `gpt-6-luna`
+- [x] Vercel 에 Frontend 배포, `NEXT_PUBLIC_API_BASE_URL` 이 Render URL (9/30 배포 번들에 Render 주소 포함 확인)
+- [x] 배포된 Frontend 에서 CORS 오류 없이 `/api/analyze` 호출 성공 (9/30 `ai-seller-insight.vercel.app` 에서 fixture 4개 → 200, KPI `expected_kpis.json` 일치)
 - [x] 저장소·빌드 로그·프론트 번들에 API 키 노출 없음
 - [x] 배포 URL 을 README 에 기재
 
