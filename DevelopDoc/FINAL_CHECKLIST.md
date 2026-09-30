@@ -91,7 +91,7 @@
 
 ## 7. 테스트 (P0)
 
-- [x] 백엔드 비유료 `pytest` 전체 통과: 351 passed, 3 deselected (유료 통합 3개는 별도 실행)
+- [x] D 후속 브랜치 최신 main/PR #18 A 리뷰 수정 통합 비유료 `pytest`: 396 passed, 3 deselected (6.21초); #23 새 지표 통합·유료3개는 제외. 이전 실행과 합산하지 않음
 - [ ] Frontend `npm run build` 성공 (타입 에러 없음)
 - [ ] 테스트 결과(C + D)가 문서로 기록됨 — C PR #20 b63a237은 단독/최신 main 임시 병합 각 191 passed, 1 deselected·독립 셀 값 로그 검사 통과, A/B 계약 동의 및 D 승인 후 main 병합 완료. D AI 6장 반영 확인. PR #23 수정·D #18 통합 회귀·A 리뷰 이후 최종 통합 기록은 대기(서로 다른 실행 수 합산 금지)
 
