@@ -31,6 +31,19 @@ def _dump(value: Any) -> Any:
     return value.model_dump() if hasattr(value, "model_dump") else value
 
 
+def _small_talk(ai, question: str, has_store: bool):
+    """인사·기능 안내는 planner 를 부르지 않고 서버 고정 문구로 답한다. 실패하면 None → 기존 흐름."""
+    reply_fn = getattr(ai, "create_small_talk_reply", None)
+    if reply_fn is None:
+        return None
+    try:
+        result = reply_fn(question, has_store=has_store)  # D
+        return Insight.model_validate(_dump(result)) if result is not None else None
+    except Exception:
+        logger.exception("small talk reply failed")
+        return None
+
+
 def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | None) -> Insight:
     """TECH_SPEC 1장 7·8단계. 예외를 밖으로 내보내지 않는다."""
     try:
@@ -38,6 +51,9 @@ def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | 
         plan, answer = None, None
 
         if question:
+            chat = _small_talk(ai, question, has_store=bool((df["platform"] == normalize.STORE_PLATFORM).any()))
+            if chat is not None:
+                return chat
             periods = sorted(df["period"].unique())
             plan_result = ai.create_analysis_plan(question, periods=periods)  # D
             if plan_result.status == "unsupported_question":
