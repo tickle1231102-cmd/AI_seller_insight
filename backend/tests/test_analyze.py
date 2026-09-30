@@ -43,7 +43,7 @@ class FakeAI:
 
 @pytest.fixture
 def fake_analysis(monkeypatch):
-    monkeypatch.setattr(normalize, "normalize_files", lambda files: pd.DataFrame(CONTRACT["rows"]))
+    monkeypatch.setattr(normalize, "normalize_files", lambda files, periods=None: pd.DataFrame(CONTRACT["rows"]))
     monkeypatch.setattr(kpi, "compute_kpis", lambda df: CONTRACT["kpis"])
     monkeypatch.setattr(compare, "build_comparison", lambda df: CONTRACT["comparison"])
     monkeypatch.setattr(compare, "run_plan", lambda df, plan: [{"platform": "coupang", "roas": 291.7}])
@@ -142,7 +142,7 @@ def test_ai_module_missing_keeps_kpis(fake_analysis, monkeypatch):
 def test_normalize_error_passes_through(monkeypatch):
     from app.core.errors import AppError
 
-    def raise_empty(files):
+    def raise_empty(files, periods=None):
         raise AppError("EMPTY_FILE", "데이터가 없는 파일입니다.", 422, {"file": files[0][0]})
 
     monkeypatch.setattr(normalize, "normalize_files", raise_empty)

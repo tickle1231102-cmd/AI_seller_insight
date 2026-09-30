@@ -349,7 +349,7 @@ def preview_file(filename: str, content: bytes) -> dict:
     }
 
 
-def normalize_files(files: list[tuple[str, bytes]]) -> pd.DataFrame:
+def normalize_files(files: list[tuple[str, bytes]], periods: dict[str, str] | None = None) -> pd.DataFrame:
     """업로드 파일 전체 [(filename, content), ...] → 공통 스키마 9개 필드 DataFrame (TECH_SPEC 4장).
 
     금액·수량은 int 로 반올림한다 (B 의 스키마가 정수만 받는다). 행은 기간·플랫폼·상품ID 순.
@@ -360,16 +360,23 @@ def normalize_files(files: list[tuple[str, bytes]]) -> pd.DataFrame:
     일자별로 내려받아 같은 월·상품이 여러 행이면 합친다.
 
     EXPORT_FORMATS 파일은 없는 지표를 0 으로 채우고 같은 월·상품 행을 합친다. 기간 정보가 없는 파일
-    (쿠팡 판매·광고 리포트)은 같이 올린 다른 파일이 모두 한 월일 때만 그 월을 쓰고, 없거나 여러 월이면 INVALID_PERIOD.
+    (쿠팡 판매·광고 리포트)은 사용자가 입력한 periods[filename] (YYYY-MM) 을 쓴다. 추정하지 않으며,
+    입력이 없거나 형식이 틀리면 INVALID_PERIOD. 파일 안에 기간이 있으면 입력값은 무시한다.
     """
-    parsed_files = [(filename, _parse(filename, content)) for filename, content in files]
-    known = {p for _, parsed in parsed_files for p in parsed.periods if p}
+    periods = periods or {}
     frames = []
-    for filename, parsed in parsed_files:
+    for filename, content in files:
+        parsed = _parse(filename, content)
         if not all(parsed.periods):
-            if len(known) != 1:  # 기간을 알 수 없거나 여러 월이 섞여 어느 월인지 모호하면 추정하지 않는다
-                raise _period_error(filename)
-            parsed.periods = [p or next(iter(known)) for p in parsed.periods]
+            given = periods.get(filename, "")
+            if not _PERIOD_RE.fullmatch(given):
+                raise AppError(
+                    "INVALID_PERIOD",
+                    f"{filename}: 파일에 기간 정보가 없습니다. 이 파일의 월(YYYY-MM)을 선택해주세요.",
+                    422,
+                    {"file": filename, "needs_input": True},
+                )
+            parsed.periods = [p or given for p in parsed.periods]
         values = {field: [int(round(v)) for v in parsed.metrics[column]] for field, column in parsed.field_map.items()}
         frame = pd.DataFrame(
             {
