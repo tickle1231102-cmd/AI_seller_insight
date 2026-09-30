@@ -4,8 +4,12 @@
 각 케이스는 (1) 기대한 HTTP 상태·오류 코드, (2) 사람이 읽을 수 있는 message, (3) 화면이 쓰는 details 를 확인한다.
 """
 
+import io
+import zipfile
+
 import pytest
 from fastapi.testclient import TestClient
+from openpyxl import Workbook
 
 from app.core.config import settings
 from app.main import app
@@ -148,11 +152,32 @@ def test_unreadable_file_is_reported_not_server_crash(endpoint, name, body):
     assert error["details"] == {"file": name}
 
 
-def test_unreadable_file_cause_is_logged_without_file_content(caplog):
-    secret = b"\x80\x81 SECRET-CELL-VALUE"
+def xlsx_with_string_in_number_cell(secret: str) -> bytes:
+    """숫자 셀의 값을 문자열로 바꿔 손상시킨 xlsx. openpyxl 이 이 값을 예외 메시지에 넣는다."""
+    wb = Workbook()
+    wb.active.append(["상품ID", "상품명", "총매출", "주문", "판매량", "광고비", "광고매출"])
+    wb.active.append(["P1", "a", 123456, 1, 1, 1, 1])
+    buf = io.BytesIO()
+    wb.save(buf)
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(buf.getvalue())) as src, zipfile.ZipFile(out, "w") as dst:
+        for item in src.infolist():
+            data = src.read(item.filename)
+            if item.filename == "xl/worksheets/sheet1.xml":
+                assert b"123456" in data
+                data = data.replace(b"123456", secret.encode())
+            dst.writestr(item, data)
+    return out.getvalue()
+
+
+def test_unreadable_file_log_has_cause_type_but_never_cell_values(caplog):
+    secret = "SECRET-CELL-VALUE"
     with caplog.at_level("WARNING", logger="app.analysis.normalize"):
-        client.post("/api/preview", files=[upload("coupang_2026-09.xlsx", secret)])
+        res = client.post("/api/preview", files=[upload("coupang_2026-09.xlsx", xlsx_with_string_in_number_cell(secret))])
+    assert res.json()["error"]["code"] == "UNREADABLE_FILE"
+    assert secret not in res.text
     record = next(r for r in caplog.records if r.name == "app.analysis.normalize")
     assert "coupang_2026-09.xlsx" in record.getMessage()
-    assert record.exc_info is not None  # 원인(예외)이 로그에 남는다
-    assert "SECRET-CELL-VALUE" not in record.getMessage()
+    assert "ValueError" in record.getMessage()  # 원인 종류는 남는다
+    assert record.exc_info is None  # 예외 원문·traceback 은 붙이지 않는다
+    assert secret not in caplog.text  # 포맷된 로그 전체(traceback 포함) 검사

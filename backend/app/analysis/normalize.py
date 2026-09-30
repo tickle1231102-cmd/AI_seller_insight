@@ -11,7 +11,9 @@ EMPTY_FILE → UNKNOWN_PLATFORM → MISSING_COLUMNS → INVALID_PERIOD → INVAL
 import io
 import logging
 import re
+import traceback
 from dataclasses import dataclass
+from pathlib import Path
 
 import pandas as pd
 
@@ -103,9 +105,12 @@ def _read_table(filename: str, content: bytes) -> pd.DataFrame:
             df = pd.read_csv(io.StringIO(_decode(content)), dtype=str, keep_default_na=False)
     except pd.errors.EmptyDataError:
         df = pd.DataFrame()
-    except Exception:  # 깨진 xlsx(zip 아님), 인코딩 불명, 표 형식이 아닌 CSV 등 — 500 대신 파일 문제로 알린다
-        # 코드 버그도 여기로 올 수 있으니 원인은 서버 로그에 남긴다 (파일 내용은 남기지 않고 파일명만).
-        logger.warning("파일을 읽지 못했습니다: %s", filename, exc_info=True)
+    except Exception as exc:  # 깨진 xlsx(zip 아님), 인코딩 불명, 표 형식이 아닌 CSV 등 — 500 대신 파일 문제로 알린다
+        # 예외 메시지·traceback 원문에는 업로드한 셀 값이 들어갈 수 있어 로그에 남기지 않는다.
+        # 코드 버그와 파일 손상을 구분할 수 있게 예외 종류와 발생 위치(파일:줄:함수)만 남긴다.
+        frames = traceback.extract_tb(exc.__traceback__)[-3:][::-1]
+        where = " <- ".join(f"{Path(f.filename).name}:{f.lineno}:{f.name}" for f in frames)
+        logger.warning("파일을 읽지 못했습니다: %s (%s, %s)", filename, type(exc).__name__, where)
         raise AppError(
             "UNREADABLE_FILE",
             f"{filename}: 파일을 읽을 수 없습니다. 파일이 손상되지 않았는지, 엑셀 또는 CSV 형식이 맞는지 확인해주세요.",
