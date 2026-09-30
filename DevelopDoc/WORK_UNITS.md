@@ -161,25 +161,26 @@
 ### WU-AI-01 LLM 클라이언트 · 실패 처리
 - **담당:** D · **리뷰:** A
 
-> D 체크 상태는 PR #18 + 후속 검증 브랜치에서 확인한 구현·테스트 결과를 병합 시 반영하기 위한 제안이다. A 승인·main 병합 전에는 팀 차원의 최종 완료로 확정하지 않는다. 배포 기존 코드 검증과 새 개선본의 배포 검증은 `D_WEDNESDAY_STATUS.md`에서 구분한다.
+> D 체크는 main에 이미 있는 client 기능만 유지한다. #18 조건/근거 개선 및 #22 품질 결과는 로컬 검증돼도 A 승인/main 병합 전 완료 체크하지 않는다. 최신 단일 기준은 `D_WEDNESDAY_STATUS.md`다.
 
 **완료 조건**
 - [x] `ai/` 내 LLM 호출 함수가 API 키를 환경변수로만 읽음 (`OPENAI_API_KEY` 우선, `LLM_API_KEY` 호환; 실제 키는 커밋하지 않음)
 - [x] 호출 1회당 타임아웃 적용 (`LLM_TIMEOUT_SECONDS`, 기본 30초 — 최신 TECH_SPEC과 일치)
 - [x] JSON 파싱/검증 실패 시 1회 재시도 후 `llm_error` 반환 (`test_structured_client_retries_invalid_output_once`)
 - [x] API 키 없음·네트워크 오류 시 예외가 밖으로 새지 않고 `llm_error` 반환 (`test_missing_api_key_is_normalized`, `test_structured_client_normalizes_provider_failure`)
-- [x] 실패 경로를 모킹한 테스트 통과 (게시 준비본 비유료 전체 351 passed, 3 deselected)
+- [x] 실패 경로를 모킹한 테스트 통과 (게시 준비본 비유료 전체 485 passed, 10 deselected)
 
 ### WU-AI-02 질문 → 분석 계획 JSON (Planner)
 - **담당:** D · **리뷰:** A
 
 **완료 조건**
-- [x] `planner.py` 가 질문 → `AnalysisPlan` (`metric`, `group_by`, `sort`, `limit`, `period`) 반환
-- [x] 허용 값 외 구조 출력은 Pydantic 검증·1회 재시도 후 `llm_error`; 현재 계약에 없는 질문 조건·명시 조건 누락·임의 축소는 질문 정책과 `unrepresented_constraints`로 `unsupported_question` 안내
-- [x] 테스트 질문 세트 30개 작성 (`backend/tests/ai_quality_cases.json`: 지원 15, 미지원 15)
-- [x] 실제 `gpt-6-luna` 테스트 질문 세트 30/30 통과(100%, 최소 기준 90% 이상)
+> 최신 구현은 로컬 회귀/실제 API 검증 완료. 체크는 A 승인과 최신 main 반영 확인 후 진행한다 (#18/#22).
+- [ ] `planner.py` 가 질문 → `AnalysisPlan` (`metric`, `group_by`, `sort`, `limit`, `period`) 반환
+- [ ] 허용 값 외 구조 출력은 Pydantic 검증·1회 재시도 후 `llm_error`; 현재 계약에 없는 질문 조건·명시 조건 누락·임의 축소는 질문 정책과 `unrepresented_constraints`로 `unsupported_question` 안내
+- [ ] 최신 테스트 질문 세트 40개 작성 (`backend/tests/ai_quality_cases.json`: 지원 26, 미지원 14)
+- [ ] 실제 `gpt-6-luna` 테스트 질문 세트 40/40 통과(고정 회귀 기준, 최소 90% 이상; 일반 정확도 보장 아님)
   - 예: "광고 효율이 가장 안 좋은 플랫폼 어디야?" → `{"metric":"roas","group_by":"platform","sort":"asc"}`
-- [x] 분석과 무관하거나 현재 계약으로 정확히 표현할 수 없는 질문은 `unsupported_question`
+- [ ] 분석과 무관하거나 현재 계약으로 정확히 표현할 수 없는 질문은 `unsupported_question`
 
 ---
 
@@ -210,11 +211,12 @@
 - **담당:** D · **리뷰:** A
 
 **완료 조건**
-- [x] `insight.py` 가 `kpis`, `comparison`, `signals`, (선택) `plan`/`answer` 를 받아 `Insight` 반환
-- [x] 출력이 `summary`, `evidence`, `checks`, `actions`, `limitations` 로 분리
-- [x] LLM은 자유 문장 대신 검증된 근거·점검·행동 ID만 선택하며, 데이터에 없는 원인·임의 숫자·메타데이터를 최종 응답에 넣을 수 없음
-- [x] 후처리: 허용하지 않은 요약·점검·행동 ID는 `llm_error`, 잘못된 evidence ID는 해당 항목만 제거; 같은 범위의 상충 계산값은 호출 전에 차단
-- [x] fixture 입력에서 광고비 +28.0%, 광고매출 +22.4%, ROAS −14.2%p 근거를 서버가 기간·대상·지표·단위와 함께 표시 (`test_real_openai_route_keeps_calculated_results_and_grounded_insight`)
+> 최신 구현은 로컬 회귀/실제 API 검증 완료. 체크는 A 승인과 최신 main 반영 확인 후 진행한다 (#18/#22).
+- [ ] `insight.py` 가 `kpis`, `comparison`, `signals`, (선택) `plan`/`answer` 를 받아 `Insight` 반환
+- [ ] 출력이 `summary`, `evidence`, `checks`, `actions`, `limitations` 로 분리
+- [ ] LLM은 자유 문장 대신 검증된 근거·점검·행동 ID만 선택하며, 데이터에 없는 원인·임의 숫자·메타데이터를 최종 응답에 넣을 수 없음
+- [ ] 후처리: 허용하지 않은 요약·점검·행동 ID는 `llm_error`, 잘못된 evidence ID는 해당 항목만 제거; 같은 범위의 상충 계산값은 호출 전에 차단
+- [ ] fixture 입력에서 광고비 +28.0%, 광고매출 +22.4%, ROAS −14.2%p 근거를 서버가 기간·대상·지표·단위와 함께 표시 (`test_real_openai_route_keeps_calculated_results_and_grounded_insight`)
 
 ### WU-BE-04 `/api/analyze` · 모듈 연결
 - **담당:** B · **리뷰:** C
@@ -281,11 +283,12 @@
 - **담당:** D · **리뷰:** A
 
 **완료 조건**
-- [x] 인사이트 품질 테스트 최소 5개 이상 구성 (`test_insight_safety.py`, `test_insight_number_grounding.py`, `ai_quality_runner.py`의 실제 인사이트 9개 시나리오)
-- [x] 모든 시나리오에서 응답의 사실 문장은 서버가 검증된 계산값으로 생성하고 호출자의 `plan`/`answer`를 보존 (숫자 변조 0건)
-- [x] 광고 소재·CTR·CPC·CVR·경쟁사·시장 상황 등 입력에 없는 원인을 모델이 단정문으로 생성하는 경로 제거 (허용되지 않은 자유 문장/ID 차단)
-- [x] 필요한 추가 데이터와 현재 확인 불가 범위를 서버의 `limitations`에 기술 (단일 월, ROAS 계산 불가, 불연속 월, 신호 없음 포함)
-- [x] 테스트 결과와 AI 활용 사례를 `DevelopDoc/AI_RELIABILITY_IMPROVEMENTS.md`, `AI_INSIGHT_SAFETY_TEST_REPORT.md`, `AI_USAGE_CASES.md`에 기록
+> 최신 구현은 로컬 회귀/실제 API 검증 완료. 체크는 A 승인과 최신 main 반영 확인 후 진행한다 (#18/#22).
+- [ ] 인사이트 품질 테스트 최소 5개 이상 구성 (`test_insight_safety.py`, `test_insight_number_grounding.py`, `ai_quality_runner.py`의 실제 인사이트 9개 시나리오)
+- [ ] 모든 시나리오에서 응답의 사실 문장은 서버가 검증된 계산값으로 생성하고 호출자의 `plan`/`answer`를 보존 (숫자 변조 0건)
+- [ ] 광고 소재·CTR·CPC·CVR·경쟁사·시장 상황 등 입력에 없는 원인을 모델이 단정문으로 생성하는 경로 제거 (허용되지 않은 자유 문장/ID 차단)
+- [ ] 필요한 추가 데이터와 현재 확인 불가 범위를 서버의 `limitations`에 기술 (단일 월, ROAS 계산 불가, 불연속 월, 신호 없음 포함)
+- [ ] 테스트 결과와 AI 활용 사례를 `DevelopDoc/AI_RELIABILITY_IMPROVEMENTS.md`, `AI_INSIGHT_SAFETY_TEST_REPORT.md`, `AI_USAGE_CASES.md`에 기록
 
 ### WU-DA-06 데이터 · 실패 케이스 QA
 - **담당:** C · **리뷰:** D
