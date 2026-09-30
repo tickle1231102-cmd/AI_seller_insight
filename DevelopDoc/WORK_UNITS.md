@@ -161,20 +161,21 @@
 ### WU-AI-01 LLM 클라이언트 · 실패 처리
 - **담당:** D · **리뷰:** A
 
-> #18 A 최종 승인/main ff214c2 병합 및 실제 main 비유료493개 확인 후 D 서버 기능만 체크했다. #22 문서/opt-in 후속과 새 배포 UI/E2E는 별도 대기다. 실제 API 결과는 동일 AI 구현29a90ea에서 실행한 기록이며 최신 단일 기준은 `D_WEDNESDAY_STATUS.md`다.
+> #18 A 최종 승인/main ff214c2 병합 및 실제 main 비유료 493개 확인 후 D 서버 기능만 체크했다. #22 문서/opt-in 후속과 새 배포 UI/E2E는 별도 대기다. 실제 API 결과는 동일 AI 구현 29a90ea에서 실행한 기록이며 최신 단일 기준은 `D_WEDNESDAY_STATUS.md`다.
 
 **완료 조건**
 - [x] `ai/` 내 LLM 호출 함수가 API 키를 환경변수로만 읽음 (`OPENAI_API_KEY` 우선, `LLM_API_KEY` 호환; 실제 키는 커밋하지 않음)
 - [x] 호출 1회당 타임아웃 적용 (`LLM_TIMEOUT_SECONDS`, 기본 30초 — 최신 TECH_SPEC과 일치)
 - [x] JSON 파싱/검증 실패 시 1회 재시도 후 `llm_error` 반환 (`test_structured_client_retries_invalid_output_once`)
 - [x] API 키 없음·네트워크 오류 시 예외가 밖으로 새지 않고 `llm_error` 반환 (`test_missing_api_key_is_normalized`, `test_structured_client_normalizes_provider_failure`)
-- [x] 실패 경로를 모킹한 테스트 통과 (실제 main 493 passed/9 deselected, #22 통합493 passed/10 deselected)
+- [x] 실패 경로를 모킹한 테스트 통과 (실제 main 493 passed/9 deselected, #22 통합 493 passed/10 deselected)
 
 ### WU-AI-02 질문 → 분석 계획 JSON (Planner)
 - **담당:** D · **리뷰:** A
 
+> #18 A 승인/main 반영 및 실제 main 회귀 확인 완료. 유료40문항은 동일 AI 구현 29a90ea의 기록이며 새 배포 UI는 별도다.
+
 **완료 조건**
-> #18 A 승인/main 반영 및 실제 main 회귀 확인 완료. 유료40문항은 동일 AI 구현29a90ea의 기록이며 새 배포 UI는 별도다.
 - [x] `planner.py` 가 질문 → `AnalysisPlan` (`metric`, `group_by`, `sort`, `limit`, `period`) 반환
 - [x] 허용 값 외 구조 출력은 Pydantic 검증·1회 재시도 후 `llm_error`; 현재 계약에 없는 질문 조건·명시 조건 누락·임의 축소는 질문 정책과 `unrepresented_constraints`로 `unsupported_question` 안내
 - [x] 최신 테스트 질문 세트 40개 작성 (`backend/tests/ai_quality_cases.json`: 지원 26, 미지원 14)

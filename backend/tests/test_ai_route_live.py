@@ -1,7 +1,7 @@
 """Opt-in paid local API integration test using only public fixture data.
 
-Run explicitly with RUN_LLM_INTEGRATION=1 and an OpenAI API key. The normal
-test suite deselects this file because it makes paid external API requests.
+Run explicitly with RUN_LLM_INTEGRATION=1 and an OpenAI API key. Without that
+flag the test skips; use ``-m "not integration"`` to deselect it entirely.
 """
 
 from __future__ import annotations
@@ -27,7 +27,16 @@ def test_real_openai_route_keeps_calculated_results_and_grounded_insight():
     expected = json.loads(
         (fixtures / "expected_kpis.json").read_text(encoding="utf-8")
     )
-    paths = sorted(fixtures.glob("*.csv"))
+    # Fixed list: expected_kpis.json describes exactly these four files.
+    paths = [
+        fixtures / name
+        for name in (
+            "coupang_2026-08.csv",
+            "coupang_2026-09.csv",
+            "naver_2026-08.csv",
+            "naver_2026-09.csv",
+        )
+    ]
     files = [
         ("files", (path.name, path.read_bytes(), "text/csv"))
         for path in paths
@@ -48,16 +57,13 @@ def test_real_openai_route_keeps_calculated_results_and_grounded_insight():
 
     insight = body["insight"]
     assert insight["status"] == "ok"
-    assert insight["plan"] == {
-        "metric": "roas",
-        "group_by": "platform",
-        "sort": "asc",
-        "limit": 5,
-        "period": None,
-    }
+    # limit is a model choice; only the plan fields that decide the answer are fixed.
+    plan = insight["plan"]
+    assert (plan["metric"], plan["group_by"], plan["sort"]) == ("roas", "platform", "asc")
+    assert plan["period"] is None
     assert insight["answer"]
     assert insight["answer"][0]["platform"] == "coupang"
-    assert insight["answer"][0]["roas"] == 291.7
+    assert insight["answer"][0]["roas"] == pytest.approx(291.7)
     assert insight["summary"]
     assert insight["evidence"]
     assert insight["limitations"]
