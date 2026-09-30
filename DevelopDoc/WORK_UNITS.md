@@ -168,7 +168,7 @@
 - [x] 호출 1회당 타임아웃 적용 (`LLM_TIMEOUT_SECONDS`, 기본 30초 — 최신 TECH_SPEC과 일치)
 - [x] JSON 파싱/검증 실패 시 1회 재시도 후 `llm_error` 반환 (`test_structured_client_retries_invalid_output_once`)
 - [x] API 키 없음·네트워크 오류 시 예외가 밖으로 새지 않고 `llm_error` 반환 (`test_missing_api_key_is_normalized`, `test_structured_client_normalizes_provider_failure`)
-- [x] 실패 경로를 모킹한 테스트 통과 (게시 준비본 비유료 전체 485 passed, 10 deselected)
+- [x] 실패 경로를 모킹한 테스트 통과 (게시 준비본 비유료 전체 493 passed, 10 deselected)
 
 ### WU-AI-02 질문 → 분석 계획 JSON (Planner)
 - **담당:** D · **리뷰:** A
