@@ -218,6 +218,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | `FILE_TOO_LARGE` | 413 | 파일 크기 초과 |
 | `UNSUPPORTED_FILE_TYPE` | 400 | 허용되지 않은 확장자 |
 | `EMPTY_FILE` | 422 | 데이터 행 없음 |
+| `UNREADABLE_FILE` | 422 | 파일을 표로 읽을 수 없음 (손상된 xlsx, 해독할 수 없는 인코딩 등) |
 | `MISSING_COLUMNS` | 422 | 필수 컬럼 누락 |
 | `INVALID_NUMBER` | 422 | 숫자 변환 실패 |
 | `UNKNOWN_PLATFORM` | 422 | 플랫폼 판별 불가 |
@@ -402,7 +403,8 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 - Region: Singapore, Instance: Free
 - Health Check Path: `/health`
 - 환경변수: `PYTHON_VERSION=3.12.10`, `ALLOWED_ORIGINS`, `LLM_MODE` (API 키는 Render 대시보드에서만 입력)
-- 저장소를 Public Git Repository 로 연결해 `main` 머지 후 자동 배포가 되지 않을 수 있음 → Render 에서 **Manual Deploy → Deploy latest commit**
+- 저장소를 Public Git Repository 로 연결해 Render 자체 자동 배포는 동작하지 않음 → GitHub Actions(`.github/workflows/render-deploy.yml`)가 `main` 에 `backend/` 변경이 push 되면 Render **Deploy Hook** 을 호출해 재배포 (URL 은 저장소 Secret `RENDER_DEPLOY_HOOK_URL`)
+- Actions 가 실패하거나 즉시 반영이 필요하면 Actions 탭에서 **Run workflow** 또는 Render 에서 **Manual Deploy → Deploy latest commit**
 
 - Render 무료 플랜 콜드 스타트 대비: 시연 전 `/health` 호출로 워밍업 (첫 요청 최대 50초 이상 지연 가능)
 
