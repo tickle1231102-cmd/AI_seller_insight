@@ -19,6 +19,19 @@ Metric = Literal[
     "ad_spend_change",
     "ad_revenue_change",
     "roas_change_pp",
+    # 스마트스토어 판매 분석 파일 전용
+    "visits",
+    "gross_revenue",
+    "aov",
+    "conversion_rate",
+    "refund_rate",
+    "discount_rate",
+    "visits_change",
+    "gross_revenue_change",
+    "aov_change",
+    "conversion_rate_change_pp",
+    "refund_rate_change_pp",
+    "discount_rate_change_pp",
 ]
 GroupBy = Literal["platform", "period", "product"]
 SortOrder = Literal["asc", "desc"]

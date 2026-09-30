@@ -30,16 +30,39 @@ const COLUMN_LABEL: Record<string, string> = {
   ad_spend_change: "광고비 증감",
   ad_revenue_change: "광고매출 증감",
   roas_change_pp: "ROAS 증감",
+  visits: "방문수",
+  gross_revenue: "총매출",
+  aov: "결제단가",
+  conversion_rate: "구매전환율",
+  refund_rate: "환불률",
+  discount_rate: "할인율",
+  visits_previous: "전월 방문수",
+  gross_revenue_previous: "전월 총매출",
+  aov_previous: "전월 결제단가",
+  conversion_rate_previous: "전월 구매전환율",
+  refund_rate_previous: "전월 환불률",
+  discount_rate_previous: "전월 할인율",
+  visits_change: "방문수 증감",
+  gross_revenue_change: "총매출 증감",
+  aov_change: "결제단가 증감",
+  conversion_rate_change_pp: "구매전환율 증감",
+  refund_rate_change_pp: "환불률 증감",
+  discount_rate_change_pp: "할인율 증감",
 };
 
-const WON_KEYS = new Set(["revenue", "ad_spend", "ad_revenue", "revenue_previous", "ad_spend_previous", "ad_revenue_previous"]);
+const WON_KEYS = new Set(
+  ["revenue", "ad_spend", "ad_revenue", "gross_revenue", "aov"].flatMap((k) => [k, `${k}_previous`]),
+);
+const PERCENT_KEYS = new Set(
+  ["roas", "conversion_rate", "refund_rate", "discount_rate"].flatMap((k) => [k, `${k}_previous`]),
+);
 
 function formatCell(key: string, v: unknown): string {
   if (v === null || v === undefined) return "-";
   if (key === "platform") return platformLabel(String(v));
   if (typeof v !== "number") return String(v);
-  if (key === "roas" || key === "roas_previous") return `${v.toFixed(1)}%`;
-  if (key === "roas_change_pp") return `${v > 0 ? "+" : ""}${v.toFixed(1)}%p`;
+  if (PERCENT_KEYS.has(key)) return `${v.toFixed(1)}%`;
+  if (key.endsWith("_change_pp")) return `${v > 0 ? "+" : ""}${v.toFixed(1)}%p`;
   if (key.endsWith("_change")) return `${v > 0 ? "+" : ""}${v.toFixed(1)}%`;
   if (WON_KEYS.has(key)) return `${Math.round(v).toLocaleString("ko-KR")}원`;
   return v.toLocaleString("ko-KR");

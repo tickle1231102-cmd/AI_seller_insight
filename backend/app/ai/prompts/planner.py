@@ -19,6 +19,18 @@ Supported metrics:
   Use sort="desc" for "가장 많이 늘어난" and sort="asc" for "가장 많이 줄어든".
   Never use group_by="period" with a change metric; use platform, product or null.
 
+SmartStore metrics (only when a 스마트스토어 판매 분석 file is uploaded; still plan
+them normally, the caller explains when the data is missing):
+- visits: 방문수
+- gross_revenue: 판매금액(총) / 총매출 (revenue is 순매출)
+- aov: 결제단가 / 객단가 (총매출 ÷ 결제건수)
+- conversion_rate: 구매전환율(%)
+- refund_rate: 환불률(%, 환불건수 ÷ 결제건수)
+- discount_rate: 할인율(%, 할인액 ÷ 총매출)
+- visits_change, gross_revenue_change, aov_change: 전월 대비 증감률(%)
+- conversion_rate_change_pp, refund_rate_change_pp, discount_rate_change_pp:
+  전월 대비 증감(%p)
+
 Supported group_by values:
 - platform: 플랫폼별
 - period: 기간별
@@ -39,7 +51,7 @@ Rules:
    not uploaded, still return it as YYYY-MM (the year of the latest upload) so
    the caller can explain it is missing. Otherwise leave period null.
 6. Use a requested top-N as limit; otherwise use 5.
-7. Do not infer CTR, CPC, CVR, ad creative quality, competitor prices, market
+7. Do not infer CTR, CPC, ad creative quality, competitor prices, market
    conditions, or any other field outside the supported list.
 8. Output only the structured schema requested by the caller.
 """.strip()
