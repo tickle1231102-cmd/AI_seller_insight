@@ -154,7 +154,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 - 매핑: `revenue`=판매금액(순), `orders`=상품결제건수, `units`=결제상품수량. `ad_spend`·`ad_revenue` 는 0. 추가 지표 `gross_revenue`(판매금액(총)), `visits`(방문수), `refund_count`, `refund_amount`, `discount_amount`(전체 할인액) 는 스토어 행에만 값이 있다 (그 외 행은 응답에서 필드 자체가 빠진다).
 - 기간: 행의 `날짜` 범위 중간이 속한 월, 없으면 파일명. 일자별 행은 월·상품별로 합친다.
 - **`kpis`·`comparison`·`signals`·질문 실행(`run_plan`)은 `naver_store` 행을 제외하고 계산**한다. `rows` 와 `store` 에만 나온다. 스토어 파일만 올리면 제외할 행이 없으므로 그 행으로 계산한다.
-- `store` (응답 최상위, 스토어 파일이 없으면 `null`): 스토어 데이터의 최신 월·직전 월 기준 `current`/`previous`/`change`(퍼널·환불률·할인율·객단가), 상품별 `products`(최대 10개), `trend`.
+- `store` (응답 최상위, 스토어 파일이 없으면 `null`): 스토어 데이터의 최신 월·달력상 앞달 기준(앞달 자료가 없으면 `previous`/`change` 는 `null`) `current`/`previous`/`change`(퍼널·환불률·할인율·객단가), 상품별 `products`(최대 10개), `trend`.
 - 방문·검색어·고객 분석 파일은 아직 지원하지 않으며 `UNSUPPORTED_DATASET` 오류를 낸다 (P1).
 
 ## 5. KPI 계산 명세
@@ -172,7 +172,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 
 - 반올림: 표시용 값은 소수 첫째 자리 (`round(x, 1)`), 내부 계산은 원값 유지
 - 분모가 0인 경우 `null` 반환 (0 이나 무한대로 표시하지 않음)
-- 비교 대상 기간: 업로드 데이터의 최신 월 vs 직전 월
+- 비교 대상 기간: 업로드 데이터의 최신 월 vs **달력상 바로 앞달**. 앞달 자료가 없으면(월이 하나뿐이거나 7월+9월처럼 건너뛴 경우) 증감은 모두 `null` (`kpis.previous_period` 도 `null`)
 
 ### 5-1. 검증용 예시 (fixture 정답)
 
