@@ -1,0 +1,268 @@
+[
+  {
+    "id": "Q01",
+    "question": "광고 효율이 가장 안 좋은 플랫폼 어디야?",
+    "expected": {
+      "status": "ok",
+      "metric": "roas",
+      "group_by": "platform",
+      "sort": "asc"
+    }
+  },
+  {
+    "id": "Q02",
+    "question": "매출이 가장 높은 플랫폼 알려줘",
+    "expected": {
+      "status": "ok",
+      "metric": "revenue",
+      "group_by": "platform",
+      "sort": "desc"
+    }
+  },
+  {
+    "id": "Q03",
+    "question": "주문이 많은 상품 5개 보여줘",
+    "expected": {
+      "status": "ok",
+      "metric": "orders",
+      "group_by": "product",
+      "sort": "desc",
+      "limit": 5
+    }
+  },
+  {
+    "id": "Q04",
+    "question": "판매량이 적은 상품은?",
+    "expected": {
+      "status": "ok",
+      "metric": "units",
+      "group_by": "product",
+      "sort": "asc"
+    }
+  },
+  {
+    "id": "Q05",
+    "question": "2026-09 광고비가 높은 플랫폼",
+    "expected": {
+      "status": "ok",
+      "metric": "ad_spend",
+      "group_by": "platform",
+      "sort": "desc",
+      "period": "2026-09"
+    }
+  },
+  {
+    "id": "Q06",
+    "question": "광고매출이 높은 플랫폼",
+    "expected": {
+      "status": "ok",
+      "metric": "ad_revenue",
+      "group_by": "platform",
+      "sort": "desc"
+    }
+  },
+  {
+    "id": "Q07",
+    "question": "월별 매출 추이 보여줘",
+    "expected": {
+      "status": "ok",
+      "metric": "revenue",
+      "group_by": "period"
+    }
+  },
+  {
+    "id": "Q08",
+    "question": "ROAS 높은 플랫폼 3개",
+    "expected": {
+      "status": "ok",
+      "metric": "roas",
+      "group_by": "platform",
+      "sort": "desc",
+      "limit": 3
+    }
+  },
+  {
+    "id": "Q09",
+    "question": "2026-08 매출 보여줘",
+    "expected": {
+      "status": "ok",
+      "metric": "revenue",
+      "period": "2026-08",
+      "group_by": null
+    }
+  },
+  {
+    "id": "Q10",
+    "question": "주문 수가 낮은 플랫폼",
+    "expected": {
+      "status": "ok",
+      "metric": "orders",
+      "group_by": "platform",
+      "sort": "asc"
+    }
+  },
+  {
+    "id": "Q11",
+    "question": "2026년 9월 매출을 보여줘",
+    "expected": {
+      "status": "ok",
+      "metric": "revenue",
+      "period": "2026-09",
+      "group_by": null
+    }
+  },
+  {
+    "id": "Q12",
+    "question": "매출이 낮은 상품 상위 2개",
+    "expected": {
+      "status": "ok",
+      "metric": "revenue",
+      "group_by": "product",
+      "sort": "asc",
+      "limit": 2
+    }
+  },
+  {
+    "id": "Q13",
+    "question": "플랫폼별 판매 수량",
+    "expected": {
+      "status": "ok",
+      "metric": "units",
+      "group_by": "platform"
+    }
+  },
+  {
+    "id": "Q14",
+    "question": "쿠팡과 네이버의 ROAS 비교",
+    "expected": {
+      "status": "ok",
+      "metric": "roas",
+      "group_by": "platform"
+    }
+  },
+  {
+    "id": "Q15",
+    "question": "2026-09 주문 수",
+    "expected": {
+      "status": "ok",
+      "metric": "orders",
+      "period": "2026-09",
+      "group_by": null
+    }
+  },
+  {
+    "id": "Q16",
+    "question": "쿠팡만 상품별 매출 보여줘",
+    "expected": {
+      "status": "unsupported_question"
+    }
+  },
+  {
+    "id": "Q17",
+    "question": "2026년 상반기 매출 합계",
+    "expected": {
+      "status": "unsupported_question"
+    }
+  },
+  {
+    "id": "Q18",
+    "question": "9월 매출 알려줘",
+    "expected": {
+      "status": "unsupported_question"
+    }
+  },
+  {
+    "id": "Q19",
+    "question": "이번달 매출",
+    "expected": {
+      "status": "unsupported_question"
+    }
+  },
+  {
+    "id": "Q20",
+    "question": "순이익 높은 상품",
+    "expected": {
+      "status": "unsupported_question"
+    }
+  },
+  {
+    "id": "Q21",
+    "question": "좋은 상품 추천해줘",
+    "expected": {
+      "status": "unsupported_question"
+    }
+  },
+  {
+    "id": "Q22",
+    "question": "매출과 주문을 같이 보여줘",
+    "expected": {
+      "status": "unsupported_question"
+    }
+  },
+  {
+    "id": "Q23",
+    "question": "상품 P001 매출",
+    "expected": {
+      "status": "unsupported_question"
+    }
+  },
+  {
+    "id": "Q24",
+    "question": "전월 대비 매출 증가율이 큰 플랫폼",
+    "expected": {
+      "status": "ok", "metric": "revenue_change", "group_by": "platform", "sort": "desc"
+    }
+  },
+  {
+    "id": "Q25",
+    "question": "광고 소재 때문에 매출이 줄었어?",
+    "expected": {
+      "status": "unsupported_question"
+    }
+  },
+  {
+    "id": "Q26",
+    "question": "2026-13 매출",
+    "expected": {
+      "status": "unsupported_question"
+    }
+  },
+  {
+    "id": "Q27",
+    "question": "매출 높은 상품 100개",
+    "expected": {
+      "status": "unsupported_question"
+    }
+  },
+  {
+    "id": "Q28",
+    "question": "네이버 전환율 알려줘",
+    "expected": {
+      "status": "unsupported_question"
+    }
+  },
+  {
+    "id": "Q29",
+    "question": "오늘 서울 날씨 알려줘",
+    "expected": {
+      "status": "unsupported_question"
+    }
+  },
+  {
+    "id": "Q30",
+    "question": "매출 높은 상품을 지역별로 보여줘",
+    "expected": {
+      "status": "unsupported_question"
+    }
+  },
+  {"id":"Q31", "question":"9월 매출 알려줘", "periods":["2026-08","2026-09"], "expected":{"status":"ok","metric":"revenue","period":"2026-09","group_by":null}},
+  {"id":"Q32", "question":"이번 달 주문 수", "periods":["2026-08","2026-09"], "expected":{"status":"ok","metric":"orders","period":"2026-09","group_by":null}},
+  {"id":"Q33", "question":"지난달 방문수", "periods":["2026-08","2026-09"], "expected":{"status":"ok","metric":"visits","period":"2026-08","group_by":null}},
+  {"id":"Q34", "question":"2026-09 스마트스토어 구매전환율", "expected":{"status":"ok","metric":"conversion_rate","period":"2026-09","group_by":null}},
+  {"id":"Q35", "question":"2026-09 상품별 환불률 높은 3개", "expected":{"status":"ok","metric":"refund_rate","period":"2026-09","group_by":"product","sort":"desc","limit":3}},
+  {"id":"Q36", "question":"2026-09 할인율", "expected":{"status":"ok","metric":"discount_rate","period":"2026-09","group_by":null}},
+  {"id":"Q37", "question":"2026-09 객단가", "expected":{"status":"ok","metric":"aov","period":"2026-09","group_by":null}},
+  {"id":"Q38", "question":"2026-09 판매금액(총)", "expected":{"status":"ok","metric":"gross_revenue","period":"2026-09","group_by":null}},
+  {"id":"Q39", "question":"2026-09 전월 대비 ROAS 낮은 플랫폼", "expected":{"status":"ok","metric":"roas_change_pp","period":"2026-09","group_by":"platform","sort":"asc"}},
+  {"id":"Q40", "question":"2026-09 방문수 전월 대비", "expected":{"status":"ok","metric":"visits_change","period":"2026-09","group_by":null}}
+]

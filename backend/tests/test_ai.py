@@ -179,11 +179,17 @@ class RecordingLLM(FakeStructuredLLM):
 def test_planner_input_includes_uploaded_periods():
     llm = RecordingLLM(decision=PlannerDecision(status="ok", plan=AnalysisPlan(metric="units", period="2026-08")))
     create_analysis_plan("8월에 제일 안 팔린 상품", periods=["2026-08", "2026-09"], llm=llm)
-    assert "Uploaded periods (oldest first): 2026-08, 2026-09" in llm.kwargs["input_text"]
-    assert llm.kwargs["input_text"].endswith("Question: 8월에 제일 안 팔린 상품")
+    import json
+    payload = json.loads(llm.kwargs["input_text"])
+    assert payload["uploaded_periods"] == ["2026-08", "2026-09"]
+    assert payload["question"] == "8월에 제일 안 팔린 상품"
+    assert payload["explicit_conditions"]["period"] == "2026-08"
 
 
-def test_planner_input_is_plain_question_without_periods():
+def test_planner_input_without_periods_still_preserves_explicit_conditions():
     llm = RecordingLLM(decision=PlannerDecision(status="ok", plan=AnalysisPlan(metric="revenue")))
     create_analysis_plan("매출 알려줘", llm=llm)
-    assert llm.kwargs["input_text"] == "매출 알려줘"
+    import json
+    payload = json.loads(llm.kwargs["input_text"])
+    assert payload["question"] == "매출 알려줘" and payload["uploaded_periods"] == []
+    assert payload["explicit_conditions"]["period"] is None
