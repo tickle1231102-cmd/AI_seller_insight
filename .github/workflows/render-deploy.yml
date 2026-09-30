@@ -1,0 +1,31 @@
+# main 에 backend 변경이 들어오면 Render Deploy Hook 을 호출해 백엔드를 재배포한다.
+# Render 가 Public Git Repository 로 연결돼 있어 자동 배포가 되지 않기 때문 (TECH_SPEC 11장).
+# Deploy Hook URL 은 저장소 Secret `RENDER_DEPLOY_HOOK_URL` 에만 저장한다 (커밋·로그 출력 금지).
+name: Render deploy (backend)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+  workflow_dispatch: # Actions 탭에서 수동 실행
+
+concurrency:
+  group: render-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy hook
+        env:
+          HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK_URL" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK_URL secret 이 설정되지 않았습니다."
+            exit 1
+          fi
+          curl --fail --silent --show-error --connect-timeout 10 --max-time 30 -X POST "$HOOK_URL" -o /dev/null
+          # Deploy Hook 은 배포를 '요청'만 한다. 실제 배포 완료는 Render 대시보드(Events)에서 확인.
+          echo "Render 배포 요청 전송 완료 (${GITHUB_SHA::7}) — 실제 배포 완료 여부는 Render Events 에서 확인"
