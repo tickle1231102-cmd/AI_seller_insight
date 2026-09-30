@@ -210,7 +210,7 @@
     "id": "Q24",
     "question": "전월 대비 매출 증가율이 큰 플랫폼",
     "expected": {
-      "status": "unsupported_question"
+      "status": "ok", "metric": "revenue_change", "group_by": "platform", "sort": "desc"
     }
   },
   {
@@ -254,5 +254,15 @@
     "expected": {
       "status": "unsupported_question"
     }
-  }
+  },
+  {"id":"Q31", "question":"9월 매출 알려줘", "periods":["2026-08","2026-09"], "expected":{"status":"ok","metric":"revenue","period":"2026-09","group_by":null}},
+  {"id":"Q32", "question":"이번 달 주문 수", "periods":["2026-08","2026-09"], "expected":{"status":"ok","metric":"orders","period":"2026-09","group_by":null}},
+  {"id":"Q33", "question":"지난달 방문수", "periods":["2026-08","2026-09"], "expected":{"status":"ok","metric":"visits","period":"2026-08","group_by":null}},
+  {"id":"Q34", "question":"2026-09 스마트스토어 구매전환율", "expected":{"status":"ok","metric":"conversion_rate","period":"2026-09","group_by":null}},
+  {"id":"Q35", "question":"2026-09 상품별 환불률 높은 3개", "expected":{"status":"ok","metric":"refund_rate","period":"2026-09","group_by":"product","sort":"desc","limit":3}},
+  {"id":"Q36", "question":"2026-09 할인율", "expected":{"status":"ok","metric":"discount_rate","period":"2026-09","group_by":null}},
+  {"id":"Q37", "question":"2026-09 객단가", "expected":{"status":"ok","metric":"aov","period":"2026-09","group_by":null}},
+  {"id":"Q38", "question":"2026-09 판매금액(총)", "expected":{"status":"ok","metric":"gross_revenue","period":"2026-09","group_by":null}},
+  {"id":"Q39", "question":"2026-09 전월 대비 ROAS 낮은 플랫폼", "expected":{"status":"ok","metric":"roas_change_pp","period":"2026-09","group_by":"platform","sort":"asc"}},
+  {"id":"Q40", "question":"2026-09 방문수 전월 대비", "expected":{"status":"ok","metric":"visits_change","period":"2026-09","group_by":null}}
 ]

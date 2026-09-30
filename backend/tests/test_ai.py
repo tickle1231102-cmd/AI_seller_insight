@@ -168,3 +168,28 @@ def test_missing_api_key_is_normalized(monkeypatch):
         )
 
     assert exc_info.value.code == "missing_api_key"
+
+
+class RecordingLLM(FakeStructuredLLM):
+    def generate_structured(self, **kwargs):
+        self.kwargs = kwargs
+        return super().generate_structured(**kwargs)
+
+
+def test_planner_input_includes_uploaded_periods():
+    llm = RecordingLLM(decision=PlannerDecision(status="ok", plan=AnalysisPlan(metric="units", period="2026-08")))
+    create_analysis_plan("8월에 제일 안 팔린 상품", periods=["2026-08", "2026-09"], llm=llm)
+    import json
+    payload = json.loads(llm.kwargs["input_text"])
+    assert payload["uploaded_periods"] == ["2026-08", "2026-09"]
+    assert payload["question"] == "8월에 제일 안 팔린 상품"
+    assert payload["explicit_conditions"]["period"] == "2026-08"
+
+
+def test_planner_input_without_periods_still_preserves_explicit_conditions():
+    llm = RecordingLLM(decision=PlannerDecision(status="ok", plan=AnalysisPlan(metric="revenue")))
+    create_analysis_plan("매출 알려줘", llm=llm)
+    import json
+    payload = json.loads(llm.kwargs["input_text"])
+    assert payload["question"] == "매출 알려줘" and payload["uploaded_periods"] == []
+    assert payload["explicit_conditions"]["period"] is None

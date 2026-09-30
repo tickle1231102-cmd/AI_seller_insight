@@ -94,7 +94,7 @@ def main():
     def evaluate(case):
         started = monotonic()
         try:
-            result = planner.create_analysis_plan(case["question"])
+            result = planner.create_analysis_plan(case["question"], periods=case.get("periods"))
             actual = result.model_dump()
             expected = case["expected"]
             passed = actual["status"] == expected["status"]
