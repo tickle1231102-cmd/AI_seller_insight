@@ -2,10 +2,21 @@ import type { Insight } from "@/types/api";
 
 import { platformLabel } from "@/lib/format";
 
+// 질문 범위 확대에 맞춰 유형별(순위·비교·필터·진단) 예시를 둔다.
+// 확장 유형은 백엔드 Planner 반영 전까지 unsupported_question 이 올 수 있다.
 export const EXAMPLE_QUESTIONS = [
   "광고 효율이 가장 안 좋은 플랫폼 어디야?",
   "이번 달 매출이 가장 높은 상품은?",
-  "광고비가 가장 많이 늘어난 플랫폼은?",
+  "전월 대비 매출이 가장 많이 떨어진 상품은?",
+  "쿠팡에서 광고비랑 광고매출 같이 보여줘",
+  "이번 달 매출이 줄어든 원인 후보는?",
+];
+
+const SUPPORTED_SCOPE = [
+  "지표 순위 (매출·주문·광고비·ROAS 등)",
+  "전월 대비 비교",
+  "플랫폼·상품 조건",
+  "원인 후보 진단",
 ];
 
 const COLUMN_LABEL: Record<string, string> = {
@@ -125,8 +136,9 @@ export function InsightBody({ insight, onRetry }: { insight: Insight; onRetry?: 
     return (
       <div className="notice">
         {/* 백엔드가 이유(없는 월, 필요한 파일, 계산 결과 모순 등)를 주면 그대로 보여준다 */}
-        {insight.summary || "이 질문은 현재 데이터로 분석하기 어렵습니다."} 예시:{" "}
-        {EXAMPLE_QUESTIONS.map((e) => `“${e}”`).join(", ")}
+        <p>{insight.summary || "이 질문은 현재 데이터로 분석하기 어렵습니다."}</p>
+        <p className="small">이런 질문을 할 수 있어요: {SUPPORTED_SCOPE.join(" · ")}</p>
+        <p className="small">예시: {EXAMPLE_QUESTIONS.map((e) => `“${e}”`).join(", ")}</p>
         {insight.limitations?.map((l) => (
           <p key={l} className="muted small">
             ※ {l}
@@ -136,6 +148,15 @@ export function InsightBody({ insight, onRetry }: { insight: Insight; onRetry?: 
     );
   }
   if (insight.status === "skipped") return null;
+
+  // 진단형 질문은 answer 표 없이 설명만 올 수 있다. 내용이 하나도 없으면 빈 카드 대신 안내한다.
+  const hasContent =
+    !!insight.summary ||
+    !!insight.answer?.length ||
+    [insight.evidence, insight.checks, insight.actions, insight.limitations].some((l) => l?.length);
+  if (!hasContent) {
+    return <div className="notice">분석 결과가 비어 있습니다. 질문을 조금 더 구체적으로 입력해보세요.</div>;
+  }
 
   return (
     <div className="insight">
