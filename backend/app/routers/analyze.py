@@ -85,11 +85,12 @@ def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | 
 
 
 def _analyze(uploads: list[UploadedFile], question: str | None, periods: dict[str, str] | None = None) -> AnalyzeResponse:
-    df = normalize.normalize_files([(u.filename, u.content) for u in uploads], periods)  # 2·3
+    df, coupang_sales = normalize.normalize_with_coupang_sales([(u.filename, u.content) for u in uploads], periods)  # 2·3
     # 스마트스토어 판매 분석 행을 kpis·comparison·신호에 넣을지는 normalize.core_rows 가 정한다 (판매액 중복 방지).
     core = normalize.core_rows(df)
     kpis = kpi.compute_kpis(core)  # 4
     store = kpi.compute_store_kpis(df)  # 4-1 스마트스토어 판매 분석 (없으면 None)
+    coupang = kpi.compute_coupang_kpis(coupang_sales)  # 4-2 쿠팡 판매 분석 (없으면 None)
     comparison = compare.build_comparison(core)  # 5
     sigs = signals.detect_signals(kpis, comparison)  # 6
     # 질문은 전체 행을 넘긴다. run_plan 이 지표마다 스마트스토어 행을 쓸지 뺄지 정한다.
@@ -101,6 +102,7 @@ def _analyze(uploads: list[UploadedFile], question: str | None, periods: dict[st
         signals=sigs,
         insight=insight,
         store=store,
+        coupang=coupang,
     )
 
 

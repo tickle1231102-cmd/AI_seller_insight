@@ -8,11 +8,11 @@ type Card = { label: string; value: string; delta: number | null; unit: string; 
 const tone = (delta: number | null, goodWhenUp: boolean) =>
   delta === null || delta === 0 ? "" : (delta > 0) === goodWhenUp ? "up" : "down";
 
-function Delta({ delta, unit, goodWhenUp }: { delta: number | null; unit: string; goodWhenUp: boolean }) {
+export function Delta({ delta, unit, goodWhenUp }: { delta: number | null; unit: string; goodWhenUp: boolean }) {
   return <span className={`delta ${tone(delta, goodWhenUp)}`}>{formatSignedPercent(delta, unit)}</span>;
 }
 
-function FunnelStep({ label, value, prev, note }: { label: string; value: string; prev?: string; note?: React.ReactNode }) {
+export function FunnelStep({ label, value, prev, note }: { label: string; value: string; prev?: string; note?: React.ReactNode }) {
   return (
     <div className="funnel-step">
       <span className="muted small">{label}</span>

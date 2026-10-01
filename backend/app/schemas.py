@@ -165,6 +165,61 @@ class StoreKPIs(BaseModel):
     trend: list[StoreTrendPoint]
 
 
+# ---- 쿠팡 판매 분석 (옵션별 지표: 퍼널·취소) ----
+class CoupangValues(BaseModel):
+    visits: int
+    views: int
+    cart_adds: int
+    orders: int
+    units: int
+    gross_revenue: Won  # 총 매출(원)
+    revenue: Won  # 매출(원), 취소 반영
+    gross_units: int
+    cancel_units: int
+    cancel_amount: Won
+    conversion_rate: float | None  # 주문/방문자 (%)
+    cart_rate: float | None  # 장바구니/방문자 (%)
+    cancel_rate: float | None  # 취소 상품수/총 판매수 (%)
+    cancel_amount_rate: float | None  # 취소 금액/총 매출 (%)
+    aov: Won | None  # 매출/주문
+
+
+class CoupangChange(BaseModel):
+    visits_change: float | None
+    orders_change: float | None
+    revenue_change: float | None
+    aov_change: float | None
+    conversion_rate_change_pp: float | None
+    cart_rate_change_pp: float | None
+    cancel_rate_change_pp: float | None
+    cancel_amount_rate_change_pp: float | None
+
+
+class CoupangProduct(BaseModel):
+    product_id: str  # 옵션 ID
+    product_name: str  # 옵션명
+    visits: int
+    cart_adds: int
+    orders: int
+    revenue: Won
+    conversion_rate: float | None
+    cart_rate: float | None
+    cancel_rate: float | None
+    aov: Won | None
+    conversion_rate_change_pp: float | None
+    cancel_rate_change_pp: float | None
+
+
+class CoupangKPIs(BaseModel):
+    period: str
+    previous_period: str | None
+    current: CoupangValues
+    previous: CoupangValues | None
+    change: CoupangChange
+    products: list[CoupangProduct]
+    trend: list[StoreTrendPoint]
+
+
 class Signal(BaseModel):
     """신호마다 추가 필드가 다르다 (TECH_SPEC 6장). signal, platform 외 필드는 그대로 통과."""
 
@@ -192,6 +247,7 @@ class AnalyzeResponse(BaseModel):
     signals: list[Signal]
     insight: Insight
     store: StoreKPIs | None = None  # 스마트스토어 판매 분석 파일이 없으면 None
+    coupang: CoupangKPIs | None = None  # 쿠팡 판매 분석(옵션별 지표) 파일이 없으면 None
 
 
 # ---- 오류 ----
