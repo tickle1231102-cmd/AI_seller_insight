@@ -27,13 +27,19 @@ def uploads():
     return [(p.name, p.read_bytes()) for p in paths]
 
 
+def coupang_sales():
+    """쿠팡 판매 분석 샘플을 8·9월 두 달로 올린 옵션별 지표 (쿠팡 지표 질문용)."""
+    sample = (FIXTURES / "exports" / "SELLER_INSIGHTS_VENDOR_ITEM_METRICS_SAMPLE_coupang.xlsx").read_bytes()
+    return normalize.normalize_with_coupang_sales([(f"cs_{p}.xlsx", sample) for p in ("2026-08", "2026-09")])[1]
+
+
 @pytest.mark.parametrize("metric", get_args(Metric))
 def test_all_public_metrics_have_exact_c_answer_evidence(metric):
     df = normalize.normalize_files(uploads())
     core = df[df["platform"] != normalize.STORE_PLATFORM]
     data = (kpi.compute_kpis(core), compare.build_comparison(core), [])
     plan = AnalysisPlan(metric=metric, period="2026-09")
-    answer = compare.run_plan(df, plan)
+    answer = compare.run_plan(df, plan, coupang_sales())
     original = deepcopy(answer)
     catalogue = EvidenceCatalogue.build(*data, plan, answer)
     assert not catalogue.conflicts and catalogue.answer_ids == [f"answer.0.{metric}"]

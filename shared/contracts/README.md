@@ -162,6 +162,7 @@ B 의 `routers/preview.py`, `routers/analyze.py` 가 아래 함수를 호출한�
 |---|---|
 | 기본 지표, 기본 전월 대비 | `normalize.core_rows` 규칙 (`kpis` 와 같다). 같은 월에 판매 수치가 있는 예전 `naver` 템플릿이 있으면 그 월의 스마트스토어 행은 뺀다(판매액 중복). 그 외에는 스마트스토어 행을 `naver` 로 합쳐 쓴다(실제 내보내기 조합). 스마트스토어 파일만 올리면 그 행을 그대로 쓴다 |
 | 스마트스토어 지표, 스마트스토어 전월 대비 | `naver_store` 행만. 없으면 `STORE_DATA_NOT_FOUND` |
+| 쿠팡 판매 분석 지표 (`coupang_visits`·`coupang_aov`·`coupang_conversion_rate`·`coupang_cart_rate`·`coupang_cancel_rate` 와 그 증감) | `run_plan(df, plan, coupang_sales)` 의 세 번째 인자(쿠팡 판매 분석 옵션별 지표)만, `platform="coupang"`. 상품별은 옵션 단위. 없으면 `COUPANG_SALES_DATA_NOT_FOUND` |
 
 *전월 대비 지표 (`*_change`, `*_change_pp`)*
 - 기준 월은 `period` (`null` 이면 위 범위 안의 최신 월), 비교 월은 **달력상 앞달**이다 (2026-01 → 2025-12). `kpis`·`store` 의 비교 월과 같은 규칙이다 (위 "KPI·비교" 참고). 앞달 자료가 없으면 더 오래된 월로 대신하지 않고 `PREVIOUS_PERIOD_NOT_FOUND` 를 던진다.

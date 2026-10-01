@@ -11,6 +11,15 @@ class Requirements:
     reason: str | None = None
 
 
+# 쿠팡 판매 분석에만 있는 지표 (장바구니율·취소율)와, 스마트스토어와 이름이 같아 "쿠팡" 이 붙어야 쿠팡 지표가 되는 것.
+COUPANG_ONLY_CART = r"장바구니\s*(?:율|률|전환율|비율)?"
+COUPANG_ONLY_CANCEL = r"취소\s*(?:율|률|비율)"
+COUPANG_ONLY = f"{COUPANG_ONLY_CART}|{COUPANG_ONLY_CANCEL}"
+COUPANG_SHARED = r"방문\s*(?:수|자)|객단가|결제\s*단가|전환\s*율"
+RATE_METRICS = {"roas", "conversion_rate", "refund_rate", "discount_rate",
+                "coupang_conversion_rate", "coupang_cart_rate", "coupang_cancel_rate"}
+
+
 def inspect_question(question: str, *, periods: list[str] | None = None) -> Requirements:
     q = question.lower()
     r = Requirements()
@@ -25,7 +34,10 @@ def inspect_question(question: str, *, periods: list[str] | None = None) -> Requ
         return block("개월 수로 지정한 기간 범위는 현재 분석 계획으로 표현할 수 없습니다. YYYY-MM 한 달 또는 기간 지정 없이 월별로 질문해 주세요.")
     platforms = set(re.findall(r"쿠팡|네이버|coupang|naver", q))
     canonical = {"coupang" if p in {"쿠팡", "coupang"} else "naver" for p in platforms}
-    if len(canonical) == 1 or re.search(r"(?<![a-z0-9])p\d{3,}(?![0-9])|상품\s*['\"‘“]|카테고리|지역별|고객별|성별|연령", q):
+    # "쿠팡 전환율"·"장바구니율" 처럼 쿠팡 판매 분석 지표를 묻는 경우 "쿠팡" 은 플랫폼 필터가 아니라 지표 선택이다.
+    coupang_sales = bool(re.search(COUPANG_ONLY, q)) or (
+        canonical == {"coupang"} and bool(re.search(COUPANG_SHARED, q)))
+    if (len(canonical) == 1 and not coupang_sales) or re.search(r"(?<![a-z0-9])p\d{3,}(?![0-9])|상품\s*['\"‘“]|카테고리|지역별|고객별|성별|연령", q):
         return block("특정 플랫폼·상품의 필터 조건 또는 해당 분류는 아직 지원하지 않습니다. 플랫폼별·상품별·월별 전체 비교로 질문해 주세요.")
     dates = re.findall(r"(?<!\d)(\d{4})(?:-\s*|년\s*)(\d{1,2})(?:월)?(?!\d)", q)
     if len(dates) > 1 or any(not 1 <= int(m) <= 12 for _, m in dates):
@@ -55,8 +67,10 @@ def inspect_question(question: str, *, periods: list[str] | None = None) -> Requ
             selected = f"{year - 1}-12" if month == 1 else f"{year}-{month - 1:02d}"
     r.expected["period"] = selected
     metrics = []
-    rest = q
+    rest = re.sub(r"쿠팡|coupang", "", q) if coupang_sales else q
     for metric, pattern in (
+        ("coupang_cart_rate", COUPANG_ONLY_CART),
+        ("coupang_cancel_rate", COUPANG_ONLY_CANCEL),
         ("gross_revenue", r"총\s*매출|판매\s*금액\s*\(\s*총\s*\)"),
         ("ad_revenue", r"광고\s*(?:전환)?\s*매출|전환\s*매출"),
         ("ad_spend", r"광고\s*비용|광고\s*비(?!교)"),
@@ -77,8 +91,10 @@ def inspect_question(question: str, *, periods: list[str] | None = None) -> Requ
         return block("한 번의 질문에서는 지표 하나만 조회할 수 있습니다. 비교할 지표를 하나씩 지정해 주세요.")
     if metrics:
         metric = metrics[0]
+        if coupang_sales and metric in {"visits", "aov", "conversion_rate"}:
+            metric = "coupang_" + metric
         if re.search(r"전월\s*대비|증감|증가율|감소율|하락폭|늘어난|증가한|줄어든|감소한|성장한", q):
-            metric += "_change_pp" if metric in {"roas", "conversion_rate", "refund_rate", "discount_rate"} else "_change"
+            metric += "_change_pp" if metric in RATE_METRICS else "_change"
         r.expected["metric"] = metric
     elif re.search(r"잘\s*팔|잘되|좋은|안\s*좋은|나쁜|성적|성과", q):
         return block("판단 기준이 모호합니다. 매출·주문 수·판매 수량·ROAS 중 기준을 지정해 주세요.")

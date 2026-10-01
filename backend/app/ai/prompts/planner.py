@@ -31,6 +31,22 @@ them normally, the caller explains when the data is missing):
 - conversion_rate_change_pp, refund_rate_change_pp, discount_rate_change_pp:
   전월 대비 증감(%p)
 
+Coupang sales metrics (only when a 쿠팡 판매 분석(옵션별 지표) file is uploaded;
+still plan them normally, the caller explains when the data is missing). They
+are different from the SmartStore metrics above. Use them when the question
+names 쿠팡 together with 방문자/전환율/결제단가, or asks about 장바구니 or 취소:
+- coupang_visits: 쿠팡 방문자
+- coupang_aov: 쿠팡 결제단가 / 객단가 (매출 ÷ 주문)
+- coupang_conversion_rate: 쿠팡 구매전환율(%, 주문 ÷ 방문자)
+- coupang_cart_rate: 장바구니율(%, 장바구니 ÷ 방문자)
+- coupang_cancel_rate: 취소율(%, 취소 상품수 ÷ 총 판매수)
+- coupang_visits_change, coupang_aov_change: 전월 대비 증감률(%)
+- coupang_conversion_rate_change_pp, coupang_cart_rate_change_pp,
+  coupang_cancel_rate_change_pp: 전월 대비 증감(%p)
+"쿠팡" in such a question selects these metrics; it is NOT an unsupported
+platform filter and does NOT mean group_by=platform. group_by=product means
+상품(옵션)별.
+
 Supported group_by values:
 - platform: 플랫폼별
 - period: 기간별
@@ -59,7 +75,7 @@ Rules:
    Never drop a filter, date range, second metric, cause, calculation or
    dimension. Platform/product filters, profit, CTR/CPC/CVR, date ranges,
    change metrics grouped by period and multi-metric queries are not supported.
-   Change-rate rankings and the listed SmartStore metrics ARE supported.
+   Change-rate rankings and the listed SmartStore and Coupang sales metrics ARE supported.
 10. If the ranking metric is ambiguous (좋은 상품), use unsupported_question.
 11. group_by=null means the entire selected month. Without an explicit month
     C uses the latest uploaded month, except group_by=period which uses
@@ -70,6 +86,7 @@ Rules:
     Preserve every explicit condition. Both supported platforms named together
     (쿠팡과 네이버의 ROAS 비교) means group_by=platform; it is NOT an
     unsupported single-platform filter. Return ok for this comparison.
-14. Data comes only from validated team templates and SmartStore SALES files.
+14. Data comes only from validated team templates, SmartStore SALES files and
+    Coupang 판매 분석(옵션별 지표) files.
     Do not claim arbitrary raw sales/ad exports or automatic joining are supported.
 """.strip()

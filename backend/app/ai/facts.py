@@ -22,8 +22,14 @@ METRICS = {
     "visits": ("방문 수", "회"), "gross_revenue": ("판매금액(총)", "원"),
     "aov": ("결제단가", "원"), "conversion_rate": ("구매전환율", "%"),
     "refund_rate": ("환불률", "%"), "discount_rate": ("할인율", "%"),
+    "coupang_visits": ("쿠팡 방문자", "명"), "coupang_aov": ("쿠팡 결제단가", "원"),
+    "coupang_conversion_rate": ("쿠팡 구매전환율", "%"), "coupang_cart_rate": ("쿠팡 장바구니율", "%"),
+    "coupang_cancel_rate": ("쿠팡 취소율", "%"),
 }
 STORE_METRICS = {"visits", "gross_revenue", "aov", "conversion_rate", "refund_rate", "discount_rate"}
+COUPANG_METRICS = {"coupang_visits", "coupang_aov", "coupang_conversion_rate", "coupang_cart_rate", "coupang_cancel_rate"}
+# 질문 지표가 공통 KPI 와 다른 데이터(최신 월이 다를 수 있음)에서 계산되는 경우의 출처 이름.
+SOURCE_LABELS = {**{m: "스마트스토어" for m in STORE_METRICS}, **{m: "쿠팡 판매 분석" for m in COUPANG_METRICS}}
 PERIOD = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
 
@@ -148,13 +154,16 @@ class EvidenceCatalogue:
             c.add(f"comparison.trend.{i}", row, row.get("period"), "전체")
         for i, row in enumerate(answer or []):
             base = plan.metric.removesuffix("_change_pp").removesuffix("_change") if plan else None
-            store_answer = base in STORE_METRICS
+            source = SOURCE_LABELS.get(base)
+            store_answer = source is not None
             # Store and core can have different latest months. The public answer
             # has no resolved month metadata; never borrow the core KPI's month.
             row_period = row.get("period") or (plan.period if plan else None) or (None if store_answer else period)
             scope = entity(row)
-            if store_answer and row.get("platform") != "naver_store":
+            if base in STORE_METRICS and row.get("platform") != "naver_store":
                 scope = "스마트스토어 / " + scope
+            elif base in COUPANG_METRICS and row.get("platform") != "coupang":
+                scope = "쿠팡 / " + scope
             previous_answer_period = None
             if PERIOD.fullmatch(str(row_period)):
                 year, month = map(int, str(row_period).split("-"))
@@ -162,24 +171,24 @@ class EvidenceCatalogue:
             start = set(c.facts)
             c.add(f"answer.{i}", row, row_period, scope,
                   metrics=[plan.metric] if plan else tuple(METRICS), change_from=previous_answer_period,
-                  period_context="스마트스토어 최신 업로드 월" if store_answer and row_period is None else None,
+                  period_context=f"{source} 최신 업로드 월" if store_answer and row_period is None else None,
                   previous_context="달력상 앞달" if row_period is None else None)
             c.answer_ids.extend(fid for fid in c.facts if fid not in start)
             if plan and plan.metric.endswith(("_change", "_change_pp")):
                 c.add(f"answer.{i}", row, row_period, scope, metrics=[base],
-                      period_context="스마트스토어 최신 업로드 월" if store_answer and row_period is None else None)
+                      period_context=f"{source} 최신 업로드 월" if store_answer and row_period is None else None)
                 c.add(f"answer.{i}.previous", {base: row.get(f"{base}_previous")},
                       previous_answer_period, scope, metrics=[base],
                       period_context="달력상 앞달" if row_period is None else None)
             if plan and number(row.get(plan.metric)) is None:
                 c.limitations.append(f"질문 결과의 {scope} / {METRICS[base][0]}는 계산 불가로 순위 판단에서 제외합니다.")
             if store_answer and row_period is None:
-                c.limitations.append("스마트스토어 질문은 해당 지표의 최신 업로드 월 기준입니다. 답 행에 기준 월이 없으므로 광고 KPI의 월로 대신 표시하지 않습니다. 명확한 월 설명은 YYYY-MM으로 질문해 주세요.")
+                c.limitations.append(f"{source} 질문은 해당 지표의 최신 업로드 월 기준입니다. 답 행에 기준 월이 없으므로 광고 KPI의 월로 대신 표시하지 않습니다. 명확한 월 설명은 YYYY-MM으로 질문해 주세요.")
             if plan and plan.metric.endswith(("_change", "_change_pp")) and row_period is None:
                 c.limitations.append("질문 증감은 해당 지표의 최신 월과 달력상 앞달 비교입니다. 날짜가 명시되지 않은 답 행의 기준 월을 추정하지 않습니다.")
         if plan:
             scope = ("업로드된 여러 기간" if plan.group_by == "period" and plan.period is None
-                     else "스마트스토어 해당 지표의 최신 업로드 월" if plan.metric.removesuffix("_change_pp").removesuffix("_change") in STORE_METRICS and plan.period is None
+                     else f"{SOURCE_LABELS[base]} 해당 지표의 최신 업로드 월" if (base := plan.metric.removesuffix("_change_pp").removesuffix("_change")) in SOURCE_LABELS and plan.period is None
                      else period_label(plan.period or period))
             c.limitations.append(f"질문 결과 범위: {scope}. 반환된 결과에 한해 설명합니다.")
         if not signals:
