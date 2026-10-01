@@ -14,7 +14,6 @@ const LAYERS = [
 
 export function MarketOrbit() {
   const root = useRef<HTMLDivElement>(null);
-  const [paused, setPaused] = useState(false);
   const [inactive, setInactive] = useState(false);
 
   useEffect(() => {
@@ -29,8 +28,8 @@ export function MarketOrbit() {
     return () => { observer.disconnect(); document.removeEventListener("visibilitychange", update); };
   }, []);
 
-  return <>
-    <div ref={root} className="market-orbit" aria-hidden="true" data-paused={paused || inactive}>
+  return (
+    <div ref={root} className="market-orbit" aria-hidden="true" data-paused={inactive}>
       <div className="market-orbit-perspective">
         {LAYERS.map((layer, layerIndex) => <div key={layer.name} className={`market-orbit-frame ${layer.name}`}
           style={{ "--orbit-size": `${layer.size}px`, "--orbit-angle": `${layer.angle}deg` } as CSSProperties}>
@@ -55,12 +54,5 @@ export function MarketOrbit() {
       </div>
       <div className="market-orbit-shade" />
     </div>
-    <button className="market-orbit-toggle" type="button" aria-pressed={paused}
-      aria-label={paused ? "배경 애니메이션 재생" : "배경 애니메이션 일시정지"} onClick={() => setPaused(value => !value)}>
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-        {paused ? <path d="M5 3v10l8-5z" /> : <path d="M4 3h3v10H4zm5 0h3v10H9z" />}
-      </svg>
-      <span>배경 {paused ? "재생" : "일시정지"}</span>
-    </button>
-  </>;
+  );
 }
