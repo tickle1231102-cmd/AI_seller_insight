@@ -146,11 +146,6 @@ export default function Home() {
           <span className="brand-name">Seller Insight AI</span>
         </div>
         <div className="topnav-right">
-          {!result && (
-            <a className="nav-link" href="#how">
-              사용 방법
-            </a>
-          )}
           {USE_MOCK && <span className="badge">Mock 데이터 모드</span>}
           <ThemeToggle />
         </div>

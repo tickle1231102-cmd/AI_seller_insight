@@ -11,7 +11,7 @@ export function Hero() {
         파일 하나로 인사이트까지
       </h1>
       <p className="hero-sub">
-        엑셀·CSV 리포트를 올리면 KPI, 플랫폼 비교, 이상 신호와 AI 액션 제안을
+        엑셀·CSV 리포트를 올리면 KPI, 플랫폼 비교, 이상 신호와 AI 액션 제안을{" "}
         <br />
         30초 안에 대시보드로 정리해드립니다.
       </p>
@@ -46,7 +46,6 @@ export function LandingDetails() {
       </section>
 
       <section className="teaser">
-        <p className="muted small center">업로드 후 이런 대시보드를 바로 확인할 수 있어요 — 예시 데이터</p>
         <div className="teaser-row">
           {SAMPLE_KPIS.map((k) => (
             <div key={k.label} className="teaser-card">

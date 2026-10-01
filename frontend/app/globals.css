@@ -202,8 +202,6 @@ td { padding: 10px; border-top: 1px solid var(--border); white-space: nowrap; }
   color: #fff; font-size: 15px; background: linear-gradient(135deg, #3b71fc, #7c3aed);
 }
 .brand-name { font-size: 18px; font-weight: 700; }
-.nav-link { color: var(--muted); font-weight: 500; text-decoration: none; }
-.nav-link:hover { color: var(--text); }
 
 .hero { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 64px 0 28px; text-align: center; }
 .hero-pill {
@@ -212,7 +210,7 @@ td { padding: 10px; border-top: 1px solid var(--border); white-space: nowrap; }
   background: rgba(59, 113, 252, 0.1); border: 1px solid rgba(59, 113, 252, 0.4);
 }
 .hero-pill i { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
-.hero-title { font-size: clamp(34px, 5vw, 60px); font-weight: 900; line-height: 1.25; letter-spacing: -0.02em; }
+.hero-title { font-size: clamp(30px, 4.2vw, 52px); font-weight: 500; line-height: 1.25; letter-spacing: -0.02em; }
 .hero-sub { font-size: 18px; line-height: 1.6; color: var(--muted); }
 
 .upload.is-hero {
@@ -392,8 +390,7 @@ td { padding: 10px; border-top: 1px solid var(--border); white-space: nowrap; }
 }
 @media (max-width: 768px) {
   .page { padding: 20px 16px; }
-  .hero-sub br, .hero-title br { display: none; }
-  .nav-link { display: none; }
+  .hero-sub br { display: none; }
   .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .compare { grid-template-columns: minmax(0, 1fr); }
   .counter { display: none; }
