@@ -43,7 +43,7 @@ class FakeAI:
 
 @pytest.fixture
 def fake_analysis(monkeypatch):
-    monkeypatch.setattr(normalize, "normalize_files", lambda files: pd.DataFrame(CONTRACT["rows"]))
+    monkeypatch.setattr(normalize, "normalize_files", lambda files, periods=None: pd.DataFrame(CONTRACT["rows"]))
     monkeypatch.setattr(kpi, "compute_kpis", lambda df: CONTRACT["kpis"])
     monkeypatch.setattr(compare, "build_comparison", lambda df: CONTRACT["comparison"])
     monkeypatch.setattr(compare, "run_plan", lambda df, plan: [{"platform": "coupang", "roas": 291.7}])
@@ -142,7 +142,7 @@ def test_ai_module_missing_keeps_kpis(fake_analysis, monkeypatch):
 def test_normalize_error_passes_through(monkeypatch):
     from app.core.errors import AppError
 
-    def raise_empty(files):
+    def raise_empty(files, periods=None):
         raise AppError("EMPTY_FILE", "데이터가 없는 파일입니다.", 422, {"file": files[0][0]})
 
     monkeypatch.setattr(normalize, "normalize_files", raise_empty)
@@ -184,3 +184,36 @@ def test_run_plan_bug_logged_separately(fake_analysis, monkeypatch, caplog):
     assert_analysis_ok(res.json())
     assert res.json()["insight"]["status"] == "llm_error"
     assert "run_plan failed" in caplog.text
+
+
+
+class ChattyAI(FakeAI):
+    def create_small_talk_reply(self, question, *, has_store=False):
+        if question.startswith("안녕"):
+            return {"status": "unsupported_question", "summary": "안녕하세요! 판매·광고 데이터를 함께 살펴보는 AI 어시스턴트예요."}
+        return None
+
+
+def test_small_talk_skips_planner(fake_analysis, monkeypatch):
+    ai = use_ai(monkeypatch, ChattyAI())
+    body = client.post("/api/analyze", files=FILES, data={"question": "안녕?"}).json()
+    assert_analysis_ok(body)
+    assert body["insight"]["status"] == "unsupported_question"
+    assert body["insight"]["summary"].startswith("안녕하세요")
+    assert not hasattr(ai, "plan_kwargs") and ai.insight_calls == []
+
+
+def test_planner_rejection_is_not_overridden(fake_analysis, monkeypatch):
+    use_ai(monkeypatch, ChattyAI(plan_status="unsupported_question"))
+    body = client.post("/api/analyze", files=FILES, data={"question": "최근 3개월 매출 합계"}).json()
+    assert body["insight"] == {**body["insight"], "status": "unsupported_question",
+                               "summary": "지원하지 않는 분석 질문입니다.", "plan": None}
+
+
+def test_small_talk_failure_keeps_normal_flow(fake_analysis, monkeypatch):
+    class Broken(ChattyAI):
+        def create_small_talk_reply(self, *a, **k):
+            raise RuntimeError("boom")
+    use_ai(monkeypatch, Broken())
+    body = client.post("/api/analyze", files=FILES, data={"question": "안녕?"}).json()
+    assert body["insight"]["status"] == "ok"

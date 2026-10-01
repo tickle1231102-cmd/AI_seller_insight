@@ -29,6 +29,10 @@ const MESSAGES: Record<string, (d?: Record<string, unknown>) => string> = {
     `${d?.file ? `${d.file}: ` : ""}숫자로 읽을 수 없는 값이 있습니다${d?.row ? ` (${d.row}행${d?.column ? ` · ${d.column}` : ""})` : ""}.`,
   UNSUPPORTED_DATASET: (d) =>
     `${d?.file ? `${d.file}: ` : ""}스마트스토어 ${d?.dataset ?? ""} 분석 파일은 아직 지원하지 않습니다. 판매 분석(SALES) 파일을 올려주세요.`,
+  INVALID_PERIOD: (d) =>
+    d?.needs_input
+      ? `${d.file}: 파일에 기간 정보가 없습니다. 파일 목록에서 월을 선택해주세요.`
+      : `${d?.file ? `${d.file}: ` : ""}기간(YYYY-MM)을 찾을 수 없습니다. 파일명에 월을 넣어주세요 (예: coupang_2026-09.csv).`,
   UNKNOWN_PLATFORM: (d) => `${d?.file ? `${d.file}: ` : ""}쿠팡·네이버 리포트 형식이 아닙니다.`,
   QUESTION_TOO_LONG: () => `질문은 ${MAX_QUESTION_LENGTH}자 이내로 입력해주세요.`,
   INTERNAL_ERROR: () => "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
@@ -64,10 +68,16 @@ export async function previewFiles(files: File[]): Promise<PreviewResponse> {
   return postForm("/api/preview", filesForm(files));
 }
 
-export async function analyzeFiles(files: File[], question?: string): Promise<AnalyzeResponse> {
+/** periods: 파일에 기간 정보가 없어 사용자가 입력한 월 { 파일명: "YYYY-MM" } */
+export async function analyzeFiles(
+  files: File[],
+  question?: string,
+  periods?: Record<string, string>,
+): Promise<AnalyzeResponse> {
   if (USE_MOCK) return mockAnalyze(files, question);
   const form = filesForm(files);
   if (question) form.append("question", question);
+  if (periods && Object.keys(periods).length) form.append("periods", JSON.stringify(periods));
   return postForm("/api/analyze", form);
 }
 

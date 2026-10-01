@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from app.analysis import compare, normalize
@@ -119,10 +120,18 @@ def test_store_metric_without_store_files(df):
     assert exc.value.code == "STORE_DATA_NOT_FOUND"
 
 
-def test_core_metrics_exclude_store_rows_when_ads_reports_exist(store_df):
-    """kpis 와 같은 규칙: 광고 리포트가 있으면 매출 등 기본 지표는 스마트스토어 행을 빼고 계산한다."""
+def test_core_metrics_merge_store_rows_into_naver_without_legacy_naver(store_df):
+    """kpis 와 같은 규칙: 판매액이 겹치는 예전 naver 리포트가 없으면 스마트스토어 행을 naver 로 합쳐 계산한다."""
     rows = compare.run_plan(store_df, plan(metric="revenue", group_by="platform"))
-    assert [r["platform"] for r in rows] == ["coupang"]
+    assert sorted(r["platform"] for r in rows) == ["coupang", "naver"]
+
+
+def test_core_metrics_exclude_store_rows_when_legacy_naver_exists(store_df, df):
+    """예전 naver 리포트(판매+광고)와 함께 올리면 판매액이 겹치므로 스마트스토어 행을 뺀다."""
+    both = pd.concat([store_df, df[df["platform"] == "naver"]], ignore_index=True)
+    rows = compare.run_plan(both, plan(metric="revenue", group_by="platform"))
+    naver = df[(df["platform"] == "naver") & (df["period"] == df["period"].max())]["revenue"].sum()
+    assert next(r for r in rows if r["platform"] == "naver")["revenue"] == naver
 
 
 def test_core_metrics_use_store_rows_when_only_store(store_df):

@@ -105,23 +105,28 @@ def test_missing_store_data_remains_explicit_and_preserves_core_kpis(monkeypatch
     assert "SALES" in body["insight"]["summary"] and body["kpis"]["current"]["revenue"] == 8000000
 
 
-@pytest.mark.parametrize("question", ["2026-11 매출", "이번 달 매출"])
+@pytest.mark.parametrize("question", ["2026-12 매출"])
 def test_store_only_month_does_not_replace_core_question_period(monkeypatch, question):
-    """Mixed uploaded months are not evidence that every metric has that month."""
+    """Mixed uploaded months are not evidence that every metric has that month.
+
+    core_rows keeps store-only months (no overlapping legacy naver sales) as naver revenue, so 2026-10/11 are
+    answerable; a month absent from every file must still be refused.
+    """
     df = normalize.normalize_files(uploads())
     store_rows = df["platform"] == normalize.STORE_PLATFORM
     df.loc[store_rows, "period"] = df.loc[store_rows, "period"].replace(
         {"2026-08": "2026-10", "2026-09": "2026-11"})
-    plan = AnalysisPlan(metric="revenue", period="2026-11")
+    plan = AnalysisPlan(metric="revenue", period="2026-12")
     monkeypatch.setattr(analyze_router, "_load_ai", lambda: SimpleNamespace(
         create_analysis_plan=partial(create_analysis_plan, llm=FakeStructuredLLM(
             PlannerDecision(status="ok", plan=plan))),
         create_insight=lambda *a, **k: pytest.fail("Missing metric month must not reach insight LLM")))
-    core = df[~store_rows]
+    core = normalize.core_rows(df)
+    assert {"2026-10", "2026-11"} <= set(core["period"])
     result = analyze_router._run_ai(
         df, kpi.compute_kpis(core), compare.build_comparison(core), [], question)
     assert result.status == "unsupported_question" and result.plan == plan.model_dump()
-    assert "2026-11" in result.summary and "2026-09" in result.summary
+    assert "2026-12" in result.summary and "2026-11" in result.summary
     assert result.answer is None
 
 

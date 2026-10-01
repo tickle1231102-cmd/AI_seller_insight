@@ -5,6 +5,7 @@ AI 단계(7·8)가 어떤 이유로 실패해도 1~6단계 결과(kpis, comparis
 """
 
 import importlib
+import json
 import logging
 from typing import Any
 
@@ -31,6 +32,19 @@ def _dump(value: Any) -> Any:
     return value.model_dump() if hasattr(value, "model_dump") else value
 
 
+def _small_talk(ai, question: str, has_store: bool):
+    """인사·기능 안내는 planner 를 부르지 않고 서버 고정 문구로 답한다. 실패하면 None → 기존 흐름."""
+    reply_fn = getattr(ai, "create_small_talk_reply", None)
+    if reply_fn is None:
+        return None
+    try:
+        result = reply_fn(question, has_store=has_store)  # D
+        return Insight.model_validate(_dump(result)) if result is not None else None
+    except Exception:
+        logger.exception("small talk reply failed")
+        return None
+
+
 def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | None) -> Insight:
     """TECH_SPEC 1장 7·8단계. 예외를 밖으로 내보내지 않는다."""
     try:
@@ -38,6 +52,9 @@ def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | 
         plan, answer = None, None
 
         if question:
+            chat = _small_talk(ai, question, has_store=bool((df["platform"] == normalize.STORE_PLATFORM).any()))
+            if chat is not None:
+                return chat
             periods = sorted(df["period"].unique())
             plan_result = ai.create_analysis_plan(question, periods=periods)  # D
             if plan_result.status == "unsupported_question":
@@ -67,13 +84,10 @@ def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | 
         return Insight(status="llm_error")
 
 
-def _analyze(uploads: list[UploadedFile], question: str | None) -> AnalyzeResponse:
-    df = normalize.normalize_files([(u.filename, u.content) for u in uploads])  # 2·3
-    # 스마트스토어 판매 분석 행은 광고 리포트와 판매액이 겹칠 수 있어 kpis·comparison·신호·질문에서 뺀다.
-    # 스토어 파일만 올린 경우에는 비어 있으므로 전체 행으로 계산한다.
-    core = df[df["platform"] != normalize.STORE_PLATFORM]
-    if core.empty:
-        core = df
+def _analyze(uploads: list[UploadedFile], question: str | None, periods: dict[str, str] | None = None) -> AnalyzeResponse:
+    df = normalize.normalize_files([(u.filename, u.content) for u in uploads], periods)  # 2·3
+    # 스마트스토어 판매 분석 행을 kpis·comparison·신호에 넣을지는 normalize.core_rows 가 정한다 (판매액 중복 방지).
+    core = normalize.core_rows(df)
     kpis = kpi.compute_kpis(core)  # 4
     store = kpi.compute_store_kpis(df)  # 4-1 스마트스토어 판매 분석 (없으면 None)
     comparison = compare.build_comparison(core)  # 5
@@ -90,12 +104,29 @@ def _analyze(uploads: list[UploadedFile], question: str | None) -> AnalyzeRespon
     )
 
 
+def _parse_periods(raw: str | None) -> dict[str, str] | None:
+    """periods 폼 필드: 기간 정보가 없는 파일의 사용자 입력 월. JSON {"파일명": "YYYY-MM"}."""
+    if not raw:
+        return None
+    try:
+        value = json.loads(raw)
+    except ValueError:
+        value = None
+    if not isinstance(value, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in value.items()):
+        raise AppError("INVALID_PERIOD", '기간 입력 형식이 올바르지 않습니다. 예: {"파일명.xlsx": "2026-09"}', 400)
+    return value
+
+
 @router.post(
     "/analyze",
     response_model=AnalyzeResponse,
     responses={400: {"model": ErrorResponse}, 413: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
 )
-async def analyze(files: list[UploadFile] | None = File(None), question: str | None = Form(None)):
+async def analyze(
+    files: list[UploadFile] | None = File(None),
+    question: str | None = Form(None),
+    periods: str | None = Form(None),
+):
     question = (question or "").strip() or None
     if question and len(question) > MAX_QUESTION_LENGTH:
         raise AppError(
@@ -104,6 +135,7 @@ async def analyze(files: list[UploadFile] | None = File(None), question: str | N
             400,
             {"max_length": MAX_QUESTION_LENGTH, "length": len(question)},
         )
+    period_inputs = _parse_periods(periods)
     uploads = await read_uploads(files)  # 1
     # pandas 계산·LLM 호출은 블로킹이라 스레드풀에서 실행해 서버가 멈추지 않게 한다.
-    return await run_in_threadpool(_analyze, uploads, question)
+    return await run_in_threadpool(_analyze, uploads, question, period_inputs)

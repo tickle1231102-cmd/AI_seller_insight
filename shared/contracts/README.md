@@ -40,7 +40,9 @@
 
 > `period` 는 원본 컬럼이 아니라 **파일명**에서 뽑는다 (예: `coupang_2026-09.csv` → `2026-09`). 규칙은 `\d{4}-(0[1-9]|1[0-2])` 이고, 없으면 날짜 범위(`sales_20260830-20260928.xlsx` → 중간이 속한 `2026-09`)를 쓰고, 그것도 없으면 `INVALID_PERIOD` 오류. 스마트스토어 판매 파일은 행의 `날짜` 범위가 먼저다.
 > 플랫폼은 파일명이 아니라 **컬럼 구조**로 판별한다 (지표 컬럼 5개 중 3개 이상 일치하는 쪽, 동률·미달이면 `UNKNOWN_PLATFORM`).
-> 스마트스토어 판매 분석(SALES) 파일은 컬럼 `채널상품번호`·`채널상품명`·`판매금액(총)` 으로 판별해 `platform="naver_store"` 로 분리한다. 광고 리포트와 판매액이 겹칠 수 있어 `kpis`·`comparison`·`signals` 에는 넣지 않고 `rows`·`store` 에 나온다. 질문 실행(`run_plan`)은 지표마다 다르다 — 기본 지표(`revenue` 등 6개와 그 증감)는 광고 리포트가 함께 있으면 이 행을 빼고, 스마트스토어 지표(`visits`·`gross_revenue`·`aov`·`conversion_rate`·`refund_rate`·`discount_rate` 와 그 증감)는 이 행만 쓴다 (3장). 셀 값 `-` 는 이 파일에서만 0 이다 (그 외는 `INVALID_NUMBER`).
+> 스마트스토어 판매 분석(SALES) 파일은 컬럼 `채널상품번호`·`채널상품명`·`판매금액(총)` 으로 판별해 `platform="naver_store"` 로 분리한다. `kpis`·`comparison`·`signals` 에 넣을지는 `normalize.core_rows` 가 월별로 정한다 — 같은 월에 판매 수치가 있는 예전 naver 리포트가 있으면 그 월의 이 행을 빼고(판매액 중복), 아니면 `naver` 로 합친다. `rows`·`store` 에는 항상 나온다. 질문 실행(`run_plan`)은 지표마다 다르다 — 기본 지표(`revenue` 등 6개와 그 증감)는 같은 `core_rows` 규칙을 쓰고, 스마트스토어 지표(`visits`·`gross_revenue`·`aov`·`conversion_rate`·`refund_rate`·`discount_rate` 와 그 증감)는 이 행만 쓴다 (3장). 셀 값 `-` 는 이 파일에서만 0 이다 (그 외는 `INVALID_NUMBER`).
+> 플랫폼 실제 내보내기 파일(`normalize.EXPORT_FORMATS`)은 판별 컬럼이 모두 있으면 그 형식으로 읽고, 없는 지표는 0 으로 채운다 — 쿠팡 판매 지표(`옵션 ID`·`등록상품ID`·`매출(원)` → coupang 판매), 쿠팡 광고 리포트(`캠페인 ID`·`광고집행 옵션ID`·`광고비` → coupang 광고, 광고매출은 `총 전환매출액(14일)`), 네이버 쇼핑검색광고 소재 보고서(`일별`·`소재`·`총비용` → naver 광고, 기간은 `일별`).
+> 파일에 기간 정보가 없으면(미리보기 `periods: []`) 추정하지 않는다. `POST /api/analyze` 의 선택 폼 필드 `periods` (JSON `{"파일명": "YYYY-MM"}`) 로 사용자가 입력한 월을 받고, 없으면 `INVALID_PERIOD` (`details.needs_input: true`). 파일 안에 기간이 있으면 입력값은 무시한다.
 > 금액 필드(`revenue`, `ad_spend`, `ad_revenue`)는 정규화 단계에서 반올림해 정수(원)로 맞춘다.
 > `preview_file` 의 `columns` 는 맨 앞이 `product_name` 이고 그 뒤가 원본 지표 컬럼명이다. 프론트 미리보기 표가 `columns` 를 행의 키로 쓰기 때문이다.
 
@@ -61,7 +63,7 @@
 | `MISSING_COLUMNS` | 422 | `file`, `missing` |
 | `INVALID_NUMBER` | 422 | `file`, `row`, `column`, `value` (`row` 는 헤더를 뺀 데이터 행 기준 1부터) |
 | `UNKNOWN_PLATFORM` | 422 | `file` |
-| `INVALID_PERIOD` | 422 | `file` (파일명에서 `_YYYY-MM` 또는 날짜 범위 기간을 찾지 못함) |
+| `INVALID_PERIOD` | 422 / 400 | `file` (파일명에서 `_YYYY-MM` 또는 날짜 범위 기간을 찾지 못함), `needs_input` (기간 정보가 없는 파일에 `periods` 입력이 없거나 형식 오류). `periods` 필드가 JSON 객체가 아니면 400·details 없음 |
 | `UNSUPPORTED_DATASET` | 422 | `file`, `dataset` (`visit`\|`query`\|`customer`; 스마트스토어 판매 분석 외 파일) |
 | `QUESTION_TOO_LONG` | 400 | `max_length` |
 | `NOT_FOUND` | 404 | — (없는 주소) |
@@ -156,7 +158,7 @@ B 의 `routers/preview.py`, `routers/analyze.py` 가 아래 함수를 호출한�
 
 | 지표 | 쓰는 행 |
 |---|---|
-| 기본 지표, 기본 전월 대비 | 쿠팡·네이버 행 (`kpis` 와 같은 규칙). 스마트스토어 파일만 올려 이 행이 하나도 없으면 스마트스토어 행 |
+| 기본 지표, 기본 전월 대비 | `normalize.core_rows` 규칙 (`kpis` 와 같다). 같은 월에 판매 수치가 있는 예전 `naver` 템플릿이 있으면 그 월의 스마트스토어 행은 뺀다(판매액 중복). 그 외에는 스마트스토어 행을 `naver` 로 합쳐 쓴다(실제 내보내기 조합). 스마트스토어 파일만 올리면 그 행을 그대로 쓴다 |
 | 스마트스토어 지표, 스마트스토어 전월 대비 | `naver_store` 행만. 없으면 `STORE_DATA_NOT_FOUND` |
 
 *전월 대비 지표 (`*_change`, `*_change_pp`)*
