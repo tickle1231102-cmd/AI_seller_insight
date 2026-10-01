@@ -2,9 +2,12 @@
 
 import { Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { TrendPoint } from "@/types/api";
+import type { AnalysisMode } from "@/features/mode/mode";
 import { formatPercent, formatWon } from "@/lib/format";
 
-export function TrendChart({ trend }: { trend: TrendPoint[] }) {
+// 응답의 trend 에는 매출·ROAS 만 있다 (#29). 모드에 따라 주가 되는 쪽만 강조한다.
+export function TrendChart({ trend, mode }: { trend: TrendPoint[]; mode: AnalysisMode }) {
+  const faded = 0.35;
   return (
     <section className="card">
       <h2>매출 · ROAS 추이</h2>
@@ -23,8 +26,18 @@ export function TrendChart({ trend }: { trend: TrendPoint[] }) {
               formatter={(v, name) => (name === "매출" ? formatWon(Number(v)) : formatPercent(Number(v)))}
             />
             <Legend />
-            <Bar yAxisId="rev" dataKey="revenue" name="매출" fill="var(--primary)" radius={[4, 4, 0, 0]} maxBarSize={48} />
-            <Line yAxisId="roas" dataKey="roas" name="ROAS" stroke="var(--warn)" strokeWidth={2} dot />
+            <Bar
+              yAxisId="rev"
+              dataKey="revenue" name="매출" fill="var(--primary)" radius={[4, 4, 0, 0]} maxBarSize={48}
+              fillOpacity={mode === "sales" ? 1 : faded}
+            />
+            <Line
+              yAxisId="roas"
+              dataKey="roas" name="ROAS" stroke="var(--warn)"
+              strokeWidth={mode === "ad" ? 3 : 2}
+              strokeOpacity={mode === "ad" ? 1 : faded}
+              dot
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>

@@ -12,6 +12,9 @@ import { StoreSection } from "@/features/dashboard/StoreSection";
 import { SignalBadges } from "@/features/dashboard/SignalBadges";
 import { InsightPanel } from "@/features/insight/InsightPanel";
 import { ChatPanel, type ChatMessage } from "@/features/insight/ChatPanel";
+import { ModeSelect } from "@/features/mode/ModeSelect";
+import { ModeToggle } from "@/features/mode/ModeToggle";
+import type { AnalysisMode } from "@/features/mode/mode";
 
 type Status = "idle" | "uploading" | "analyzing" | "done" | "error";
 
@@ -28,6 +31,8 @@ export default function Home() {
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatPending, setChatPending] = useState(false);
+  // 분석 유형은 첫 분석 결과가 나온 뒤 고른다. 표시만 바꾸므로 바꿔도 API 를 다시 부르지 않는다 (#29).
+  const [mode, setMode] = useState<AnalysisMode | null>(null);
   const nextId = useRef(0);
 
   const handleFilesChange = async (next: File[]) => {
@@ -101,6 +106,8 @@ export default function Home() {
       ? `${result.kpis.previous_period} vs ${result.kpis.period}`
       : result.kpis.period
     : null;
+  // 광고 리포트 없이 스마트스토어만 올린 경우. 광고비 0 은 정상 광고 데이터에도 있어 플랫폼으로 판단한다.
+  const storeOnly = !!result && result.comparison.by_platform.every((p) => p.platform === "naver_store");
 
   return (
     <main className="page">
@@ -137,7 +144,9 @@ export default function Home() {
         </div>
       )}
 
-      {result && (
+      {result && !mode && <ModeSelect onSelect={setMode} />}
+
+      {result && mode && (
         <div className={`results${status === "analyzing" ? " is-stale" : ""}`}>
           <div className="filter-row card">
             <span className="chip">전체 플랫폼</span>
@@ -147,18 +156,31 @@ export default function Home() {
               </span>
             ))}
             <span className="grow" />
+            <ModeToggle mode={mode} onChange={setMode} />
             {periodLabel && <span className="chip">{periodLabel}</span>}
             <span className="muted small">업로드 파일 {files.length}개</span>
           </div>
 
-          <KpiCards kpis={result.kpis} />
+          {mode === "ad" && storeOnly ? (
+            <div className="notice warn">
+              광고 리포트가 없어요. 쿠팡·네이버 광고 파일을 함께 올리거나 매출 분석으로 전환해 주세요.
+            </div>
+          ) : (
+            <KpiCards kpis={result.kpis} mode={mode} />
+          )}
           <SignalBadges signals={result.signals} />
-          {result.store && <StoreSection store={result.store} />}
+          {mode === "sales" && result.store && <StoreSection store={result.store} />}
 
+          <p className="muted small">AI는 선택한 화면 모드와 무관하게 업로드된 전체 데이터 기준으로 답합니다.</p>
           <div className="main-row">
             <div className="left-col">
-              <TrendChart trend={result.comparison.trend} />
-              <PlatformCompare data={result.comparison.by_platform} />
+              {!(mode === "ad" && storeOnly) && (
+                <>
+                  <TrendChart trend={result.comparison.trend} mode={mode} />
+                  <PlatformCompare data={result.comparison.by_platform} mode={mode} />
+                </>
+              )}
+              {mode === "ad" && result.store && <StoreSection store={result.store} />}
             </div>
             <InsightPanel insight={result.insight} onRetry={runAnalyze} />
           </div>
@@ -168,7 +190,7 @@ export default function Home() {
       <ChatPanel
         messages={messages}
         pending={chatPending}
-        disabled={!result}
+        disabled={!result || !mode}
         onSend={sendQuestion}
         onReset={() => setMessages([])}
       />
