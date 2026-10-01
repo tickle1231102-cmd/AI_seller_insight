@@ -83,6 +83,8 @@ export default function Home() {
     setError(null);
     setStatus("analyzing");
     const seq = ++analyzeSeq.current;
+    // 진행 중이던 질문의 답은 버려지므로 대기 상태도 함께 푼다.
+    setChatPending(false);
     const snapshot = { files, periods: periodInputs };
     try {
       const res = await analyzeFiles(snapshot.files, undefined, snapshot.periods);
@@ -102,7 +104,8 @@ export default function Home() {
   };
 
   const sendQuestion = async (question: string) => {
-    if (!analyzed) return;
+    // 재분석 중에는 analyzed 가 아직 이전 기준이라, 답이 새 결과 뒤에 붙지 않도록 질문을 막는다.
+    if (!analyzed || status === "analyzing") return;
     const seq = analyzeSeq.current;
     setMessages((m) => [...m, { id: nextId.current++, role: "user", text: question }]);
     setChatPending(true);
@@ -114,7 +117,7 @@ export default function Home() {
       if (seq !== analyzeSeq.current) return;
       setMessages((m) => [...m, { id: nextId.current++, role: "error", text: errorMessage(e) }]);
     } finally {
-      setChatPending(false);
+      if (seq === analyzeSeq.current) setChatPending(false);
     }
   };
 
@@ -218,7 +221,7 @@ export default function Home() {
       <ChatPanel
         messages={messages}
         pending={chatPending}
-        disabled={!result || !mode}
+        disabled={!result || !mode || status === "analyzing"}
         onSend={sendQuestion}
         onReset={() => setMessages([])}
       />
