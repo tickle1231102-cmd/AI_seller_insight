@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
-import { Noto_Sans_KR } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const notoSansKr = Noto_Sans_KR({
-  weight: ["400", "500", "700", "900"],
+const pretendard = localFont({
+  src: "./fonts/PretendardVariable.woff2",
+  weight: "45 920",
   display: "swap",
-  preload: false,
-  variable: "--font-kr",
+  variable: "--font-pretendard",
 });
 
 export const metadata: Metadata = {
@@ -19,7 +19,7 @@ const themeScript = `var t="light";try{var saved=localStorage.getItem("theme");i
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ko" data-theme="light" className={notoSansKr.variable} suppressHydrationWarning>
+    <html lang="ko" data-theme="light" className={pretendard.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
