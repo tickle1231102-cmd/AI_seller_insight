@@ -222,6 +222,13 @@ export default function Home() {
         messages={messages}
         pending={chatPending}
         disabled={!result || !mode || status === "analyzing"}
+        disabledReason={
+          status === "analyzing"
+            ? "분석 중이에요. 분석이 끝나면 질문할 수 있어요."
+            : result && !mode
+              ? "분석 유형을 고르면 질문할 수 있어요."
+              : undefined
+        }
         onSend={sendQuestion}
         onReset={() => setMessages([])}
       />
