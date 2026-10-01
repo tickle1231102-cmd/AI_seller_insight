@@ -4,12 +4,14 @@ import { formatCount, formatPercent, formatSignedPercent, formatWon } from "@/li
 
 type Item = { label: string; value: string; delta: number | null; unit: string; goodWhenUp: boolean };
 
-const NO_PREV = "비교할 전월 자료가 없어요";
+// 증감 null 은 전월 자료가 없을 때와, 전월 값이 0 이라 계산할 수 없을 때 모두 나온다.
+const nullReason = (hasPrev: boolean) =>
+  hasPrev ? "전월 대비 계산 불가 (기준값 0 등)" : "비교할 전월 자료가 없어요";
 
-function Delta({ it }: { it: Item }) {
+function Delta({ it, hasPrev }: { it: Item; hasPrev: boolean }) {
   const tone = it.delta === null || it.delta === 0 ? "" : (it.delta > 0) === it.goodWhenUp ? "up" : "down";
   return (
-    <span className="small" title={it.delta === null ? NO_PREV : undefined}>
+    <span className="small" title={it.delta === null ? nullReason(hasPrev) : undefined}>
       <span className={`delta ${tone}`}>{formatSignedPercent(it.delta, it.unit)}</span>
       <span className="muted"> 전월 대비</span>
     </span>
@@ -37,7 +39,7 @@ export function KpiCards({ kpis, mode }: { kpis: Kpis; mode: AnalysisMode }) {
           <div key={it.label} className="card kpi">
             <span className="muted small">{it.label}</span>
             <strong className="kpi-value">{it.value}</strong>
-            <Delta it={it} />
+            <Delta it={it} hasPrev={!!kpis.previous_period} />
           </div>
         ))}
       </div>
@@ -46,7 +48,7 @@ export function KpiCards({ kpis, mode }: { kpis: Kpis; mode: AnalysisMode }) {
           <div key={it.label} className="kpi-mini">
             <span className="muted small">{it.label}</span>
             <strong>{it.value}</strong>
-            <Delta it={it} />
+            <Delta it={it} hasPrev={!!kpis.previous_period} />
           </div>
         ))}
       </div>

@@ -33,7 +33,11 @@ export default function Home() {
   const [chatPending, setChatPending] = useState(false);
   // 분석 유형은 첫 분석 결과가 나온 뒤 고른다. 표시만 바꾸므로 바꿔도 API 를 다시 부르지 않는다 (#29).
   const [mode, setMode] = useState<AnalysisMode | null>(null);
+  // 마지막으로 성공한 분석의 입력. 파일·월을 바꿔도 화면 결과와 질문이 같은 기준을 쓰도록 질문은 이 스냅샷으로 보낸다.
+  const [analyzed, setAnalyzed] = useState<{ files: File[]; periods: Record<string, string> } | null>(null);
   const nextId = useRef(0);
+  // 늦게 도착한 이전 분석·질문 응답이 새 결과를 덮지 않도록 분석마다 올린다.
+  const analyzeSeq = useRef(0);
 
   const handleFilesChange = async (next: File[]) => {
     setError(null);
@@ -78,28 +82,42 @@ export default function Home() {
     }
     setError(null);
     setStatus("analyzing");
+    const seq = ++analyzeSeq.current;
+    const snapshot = { files, periods: periodInputs };
     try {
-      setResult(await analyzeFiles(files, undefined, periodInputs));
+      const res = await analyzeFiles(snapshot.files, undefined, snapshot.periods);
+      if (seq !== analyzeSeq.current) return;
+      setResult(res);
+      setAnalyzed(snapshot);
+      // 분석 기준이 바뀌었으므로 이전 기준의 대화는 비운다.
+      setMessages([]);
       setStatus("done");
     } catch (e) {
+      if (seq !== analyzeSeq.current) return;
       setError(errorMessage(e));
       setStatus("error");
     }
   };
 
   const sendQuestion = async (question: string) => {
+    if (!analyzed) return;
+    const seq = analyzeSeq.current;
     setMessages((m) => [...m, { id: nextId.current++, role: "user", text: question }]);
     setChatPending(true);
     try {
-      const res = await analyzeFiles(files, question, periodInputs);
+      const res = await analyzeFiles(analyzed.files, question, analyzed.periods);
+      if (seq !== analyzeSeq.current) return;
       setMessages((m) => [...m, { id: nextId.current++, role: "ai", insight: res.insight }]);
     } catch (e) {
+      if (seq !== analyzeSeq.current) return;
       setMessages((m) => [...m, { id: nextId.current++, role: "error", text: errorMessage(e) }]);
     } finally {
       setChatPending(false);
     }
   };
 
+  // 분석 뒤에 파일이나 월 입력을 바꿨는지. 화면 결과·질문은 마지막 분석 기준 그대로다.
+  const inputsChanged = !!analyzed && (files !== analyzed.files || periodInputs !== analyzed.periods);
   const busy = status === "uploading" || status === "analyzing";
   const periodLabel = result
     ? result.kpis.previous_period
@@ -141,6 +159,12 @@ export default function Home() {
         <div className="loading">
           <div className="spinner" />
           데이터를 분석하고 있습니다...
+        </div>
+      )}
+
+      {result && inputsChanged && status !== "analyzing" && (
+        <div className="notice warn">
+          파일이나 월을 바꿨어요. 아래 결과와 AI 답변은 이전 분석 기준이에요. 다시 분석하면 새 기준으로 바뀌어요.
         </div>
       )}
 
