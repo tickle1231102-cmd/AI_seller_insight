@@ -95,20 +95,20 @@
 - **담당:** A · **리뷰:** B
 
 **완료 조건**
-- [ ] 여러 `.xlsx`/`.csv` 파일을 한 번에 선택 가능
-- [ ] 선택된 파일 목록(파일명, 크기) 표시, 개별 삭제 가능
-- [ ] 허용되지 않은 확장자는 선택 단계에서 안내
-- [ ] 미리보기 표 컴포넌트가 mock 데이터(계약 예시 JSON)로 렌더링
+- [x] 여러 `.xlsx`/`.csv` 파일을 한 번에 선택 가능 (`UploadPanel.tsx`, 드래그·클릭 모두, PR #1)
+- [x] 선택된 파일 목록(파일명, 크기) 표시, 개별 삭제 가능 (PR #1)
+- [x] 허용되지 않은 확장자는 선택 단계에서 안내 (`client.ts` `ALLOWED_EXTENSIONS` 검사, 서버 호출 전)
+- [x] 미리보기 표 컴포넌트가 mock 데이터(계약 예시 JSON)로 렌더링 (`lib/api/mock.ts`, 실제 API 로도 확인)
 
 ### WU-FE-02 KPI 대시보드 UI
 - **담당:** A · **리뷰:** B
 
 **완료 조건**
-- [ ] KPI 카드 6개 (매출, 주문, 판매량, 광고비, 광고매출, ROAS) 렌더링
-- [ ] 전월 대비 변화 표시, 증가/감소 색상 구분, ROAS는 `%p` 표기
-- [ ] 금액 천 단위 콤마 + `원` 표기
-- [ ] 계약 예시 JSON(mock)으로 전체 화면 렌더링 확인
-- [ ] 값이 `null` 인 경우 `-` 로 표시
+- [x] KPI 카드 6개 (매출, 주문, 판매량, 광고비, 광고매출, ROAS) 렌더링 (`KpiCards.tsx`)
+- [x] 전월 대비 변화 표시, 증가/감소 색상 구분, ROAS는 `%p` 표기
+- [x] 금액 천 단위 콤마 + `원` 표기 (`lib/format.ts`)
+- [x] 계약 예시 JSON(mock)으로 전체 화면 렌더링 확인
+- [x] 값이 `null` 인 경우 `-` 로 표시 (포맷 함수 기준, TEST_RESULTS 5장)
 
 ### WU-BE-01 FastAPI 서버 · 설정 · CORS
 - **담당:** B · **리뷰:** C
@@ -233,39 +233,39 @@
 - **담당:** A · **리뷰:** B
 
 **완료 조건**
-- [ ] `lib/api/` 에 `preview`, `analyze` 클라이언트 함수 (`NEXT_PUBLIC_API_BASE_URL` 사용)
-- [ ] `types/` 의 응답 타입이 계약과 일치
-- [ ] 업로드 → `/api/preview` 결과로 파일 목록·플랫폼·기간·미리보기 표시
-- [ ] 분석 버튼 → `/api/analyze` 결과로 KPI 카드 표시
-- [ ] mock 데이터 의존 코드 제거
+- [x] `lib/api/` 에 `preview`, `analyze` 클라이언트 함수 (`NEXT_PUBLIC_API_BASE_URL` 사용, `client.ts`)
+- [x] `types/` 의 응답 타입이 계약과 일치 (`types/api.ts`)
+- [x] 업로드 → `/api/preview` 결과로 파일 목록·플랫폼·기간·미리보기 표시 (10/1 배포 화면, fixture 4개)
+- [x] 분석 버튼 → `/api/analyze` 결과로 KPI 카드 표시 (10/1 배포 화면: 매출 12,600,000원 +21.2%, ROAS 312.5% −14.2%p — `expected_kpis.json` 일치)
+- [ ] mock 데이터 의존 코드 제거 — ⏳ 실제 API 경로는 mock 을 쓰지 않지만, `NEXT_PUBLIC_API_BASE_URL` 이 비었을 때 쓰는 mock 대체 모드(`lib/api/mock.ts`)는 남겨 둠. 제거할지 조건 문구를 바꿀지 팀 판단 필요
 
 ### WU-FE-04 차트 (플랫폼 비교 · 추이)
 - **담당:** A · **리뷰:** B
 
 **완료 조건**
-- [ ] Recharts 플랫폼 비교 차트 (`comparison.by_platform` 의 매출·ROAS)
-- [ ] Recharts 기간 추이 차트 (`comparison.trend` 의 매출·ROAS)
-- [ ] 툴팁에 포맷된 값 표시
-- [ ] 데이터가 한 기간뿐이어도 오류 없이 표시
-- [ ] 이상 신호(`signals`) 배지 표시
+- [x] Recharts 플랫폼 비교 차트 (`comparison.by_platform` 의 매출·ROAS, `PlatformCompare.tsx`)
+- [x] Recharts 기간 추이 차트 (`comparison.trend` 의 매출·ROAS, `TrendChart.tsx`)
+- [x] 툴팁에 포맷된 값 표시 (`formatWon`·`formatPercent`)
+- [x] 데이터가 한 기간뿐이어도 오류 없이 표시
+- [x] 이상 신호(`signals`) 배지 표시 (`SignalBadges.tsx`, 배포 화면에서 `광고비 +28.0% 증가, ROAS -14.2%p` 확인)
 
 ### WU-FE-05 AI 질문 · 인사이트 UI
 - **담당:** A · **리뷰:** B
 
 **완료 조건**
-- [ ] 질문 입력창 (300자 제한, 글자 수 표시) 및 예시 질문 버튼
-- [ ] `summary`, `evidence`, `checks`, `actions`, `limitations` 가 구분된 섹션으로 표시
-- [ ] `answer` 결과 표 표시
-- [ ] `insight.status` 별 처리: `unsupported_question` → 예시 안내, `llm_error` → 재시도 안내 (KPI 영역은 유지)
+- [x] 질문 입력창 (300자 제한, 글자 수 표시) 및 예시 질문 버튼 (`ChatPanel.tsx`, PR #1)
+- [x] `summary`, `evidence`, `checks`, `actions`, `limitations` 가 구분된 섹션으로 표시 (`InsightBody.tsx`)
+- [x] `answer` 결과 표 표시 (`InsightBody.tsx::AnswerTable`)
+- [x] `insight.status` 별 처리: `unsupported_question` → 예시 안내, `llm_error` → 재시도 안내 (KPI 영역은 유지) (서버 limitations 표시 #23, `llm_error` 모의 확인 TEST_RESULTS 6장)
 
 ### WU-FE-06 로딩 · 오류 · 반응형
 - **담당:** A · **리뷰:** B
 
 **완료 조건**
-- [ ] 업로드·분석·AI 응답 중 로딩 표시, 중복 요청 방지 (버튼 비활성화)
-- [ ] 오류 코드별 사용자 메시지 표시 (최소 `FILE_TOO_LARGE`, `TOO_MANY_FILES`, `MISSING_COLUMNS`, `INVALID_NUMBER`, `EMPTY_FILE`, 네트워크 오류)
-- [ ] 모바일 폭(375px)에서 가로 스크롤 없이 주요 화면 확인 가능
-- [ ] 콘솔 에러 없음
+- [x] 업로드·분석·AI 응답 중 로딩 표시, 중복 요청 방지 (버튼 비활성화) (`확인 중...`·`분석 중...`, 처리 중 버튼 `disabled`)
+- [x] 오류 코드별 사용자 메시지 표시 (최소 `FILE_TOO_LARGE`, `TOO_MANY_FILES`, `MISSING_COLUMNS`, `INVALID_NUMBER`, `EMPTY_FILE`, 네트워크 오류) (`client.ts` 문구 표 + `UNREADABLE_FILE` #25, 배포 화면 확인 TEST_RESULTS 3장)
+- [x] 모바일 폭(375px)에서 가로 스크롤 없이 주요 화면 확인 가능 (10/1 배포 화면, 375×812 에뮬레이션: fixture 4개 업로드 → 분석 → KPI·차트·신호·인사이트까지 페이지 `scrollWidth` 375 = 화면 폭. 플랫폼 비교 표만 자기 영역 안에서 가로 스크롤(`.table-wrap`). 실제 휴대폰 기기로는 확인하지 못함)
+- [x] 콘솔 에러 없음 (10/1 배포 화면, 위 흐름에서 콘솔 오류 0건)
 
 ### WU-BE-05 오류 처리 통일
 - **담당:** B · **리뷰:** C
