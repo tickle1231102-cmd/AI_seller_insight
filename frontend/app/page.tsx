@@ -12,7 +12,7 @@ import { StoreSection } from "@/features/dashboard/StoreSection";
 import { DashboardViewToggle, PlatformDashboard, type DashboardView } from "@/features/dashboard/PlatformDashboard";
 import { label as dashboardPlatformLabel } from "@/features/dashboard/dashboardMetrics";
 import { SignalBadges } from "@/features/dashboard/SignalBadges";
-import { InsightPanel } from "@/features/insight/InsightPanel";
+import { FloatingInsight } from "@/features/insight/FloatingInsight";
 import { ChatPanel, type ChatMessage } from "@/features/insight/ChatPanel";
 import { ModeSelect } from "@/features/mode/ModeSelect";
 import { ModeToggle } from "@/features/mode/ModeToggle";
@@ -143,7 +143,7 @@ export default function Home() {
     result.comparison.by_platform.every((p) => p.platform === "naver_store");
 
   return (
-    <main className="page">
+    <main className={`page${result && mode ? " has-summary-fab" : ""}`}>
       <div className="glow" aria-hidden />
       <header className="topnav">
         <div className="brand">
@@ -218,8 +218,7 @@ export default function Home() {
           {!result.dashboard && mode === "sales" && result.store && <StoreSection store={result.store} />}
 
           <p className="muted small">AI는 선택한 화면 모드와 무관하게 업로드된 전체 데이터 기준으로 답합니다.</p>
-          <div className={result.dashboard ? "" : "main-row"}>
-            {!result.dashboard && (
+          {!result.dashboard && (
             <div className="left-col">
               {!(mode === "ad" && storeOnly) && (
                 <>
@@ -229,13 +228,13 @@ export default function Home() {
               )}
               {!result.dashboard && mode === "ad" && result.store && <StoreSection store={result.store} />}
             </div>
-            )}
-            <InsightPanel insight={result.insight} onRetry={runAnalyze} />
-          </div>
+          )}
         </div>
       )}
 
       {!result && status !== "analyzing" && <LandingDetails />}
+
+      {result && mode && <FloatingInsight insight={result.insight} period={periodLabel ?? result.kpis.period} busy={status === "analyzing"} stale={inputsChanged} onRetry={runAnalyze} />}
 
       {result && (
         <ChatPanel
