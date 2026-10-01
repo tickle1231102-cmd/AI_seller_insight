@@ -61,7 +61,7 @@ export function UploadPanel({
         }}
       >
         <span className="dz-icon" aria-hidden>↑</span>
-        <strong className="dz-title">파일 끌어다 놓기</strong>
+        <strong className="dz-title">Drag &amp; drop files</strong>
         <span className="muted">Excel(.xlsx), CSV · 최대 10개 · 파일당 5MB</span>
         <span className="btn primary dz-btn">파일 선택하기</span>
         <span className="dz-platforms">
