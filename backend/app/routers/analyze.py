@@ -13,6 +13,7 @@ from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.concurrency import run_in_threadpool
 
 from app.analysis import compare, kpi, normalize, signals
+from app.analysis.dashboard import build_dashboard
 from app.core.errors import AppError
 from app.core.uploads import UploadedFile, read_uploads
 from app.schemas import AnalyzeResponse, ErrorResponse, Insight
@@ -101,6 +102,7 @@ def _analyze(uploads: list[UploadedFile], question: str | None, periods: dict[st
         signals=sigs,
         insight=insight,
         store=store,
+        dashboard=build_dashboard(df, kpis["period"]),
     )
 
 
