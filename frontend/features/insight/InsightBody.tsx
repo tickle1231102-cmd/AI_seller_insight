@@ -9,6 +9,10 @@ export const EXAMPLE_QUESTIONS = [
 ];
 
 const COLUMN_LABEL: Record<string, string> = {
+  rank: "순위",
+  score: "충족 조건 수",
+  evaluated_rules: "확인 가능 조건 수",
+  data_scope: "자료 구분",
   platform: "플랫폼",
   period: "기간",
   product_name: "상품",
@@ -69,7 +73,13 @@ function formatCell(key: string, v: unknown): string {
 }
 
 function AnswerTable({ rows }: { rows: Record<string, unknown>[] }) {
-  const cols = Object.keys(rows[0]);
+  const isDiagnosis = rows.every((r) => r.diagnosis === "opportunity" || r.diagnosis === "attention");
+  const cols = isDiagnosis
+    ? ["rank", "product_name", "platform", "score", "evaluated_rules", "data_scope",
+        "revenue_change", "orders_change", "units_change", "roas", "roas_change_pp",
+        "ad_spend_change", "ad_revenue_change", "conversion_rate_change_pp", "refund_rate_change_pp"]
+        .filter((key) => rows.some((r) => r[key] !== null && r[key] !== undefined))
+    : Object.keys(rows[0]);
   return (
     <div className="table-wrap answer">
       <table>
