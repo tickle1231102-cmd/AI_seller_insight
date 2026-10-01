@@ -14,11 +14,13 @@ interface Props {
   messages: ChatMessage[];
   pending: boolean;
   disabled: boolean;
+  // 비활성일 때 보여줄 이유. 없으면 업로드 안내를 쓴다.
+  disabledReason?: string;
   onSend: (question: string) => void;
   onReset: () => void;
 }
 
-export function ChatPanel({ messages, pending, disabled, onSend, onReset }: Props) {
+export function ChatPanel({ messages, pending, disabled, disabledReason, onSend, onReset }: Props) {
   const [text, setText] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -46,7 +48,9 @@ export function ChatPanel({ messages, pending, disabled, onSend, onReset }: Prop
       <div className="chat-list" ref={listRef}>
         {messages.length === 0 && (
           <p className="muted small center">
-            {disabled ? "파일을 업로드하고 분석을 시작하면 질문할 수 있습니다." : "판매·광고 데이터에 대해 무엇이든 물어보세요."}
+            {disabled
+              ? (disabledReason ?? "파일을 업로드하고 분석을 시작하면 질문할 수 있습니다.")
+              : "판매·광고 데이터에 대해 무엇이든 물어보세요."}
           </p>
         )}
         {messages.map((m) =>
@@ -97,7 +101,7 @@ export function ChatPanel({ messages, pending, disabled, onSend, onReset }: Prop
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="판매·광고 데이터에 대해 질문해보세요..."
+          placeholder={(disabled && disabledReason) || "판매·광고 데이터에 대해 질문해보세요..."}
           maxLength={MAX_QUESTION_LENGTH}
           disabled={disabled}
         />
