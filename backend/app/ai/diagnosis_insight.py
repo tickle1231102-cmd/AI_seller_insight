@@ -51,7 +51,8 @@ def create_diagnosis_insight(plan: ProductDiagnosisPlan, answer: Sequence[Mappin
     caller = {"plan": plan, "answer": rows}
     title = "기회 상품 후보" if plan.diagnosis_intent == "opportunity" else "관리 필요 상품"
     if not rows:
-        return Insight(status="ok", **caller, summary=f"비교 가능한 업로드 자료에서 요청 조건을 충족하는 {title}이 없습니다.",
+        particle = "가" if plan.diagnosis_intent == "opportunity" else "이"
+        return Insight(status="ok", **caller, summary=f"비교 가능한 업로드 자료에서 요청 조건을 충족하는 {title}{particle} 없습니다.",
                        checks=["두 달의 상품별 자료와 누락 지표를 확인하세요."], limitations=LIMITATIONS)
     try:
         if len(rows) > plan.limit:

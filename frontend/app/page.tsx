@@ -9,12 +9,18 @@ import { KpiCards } from "@/features/dashboard/KpiCards";
 import { TrendChart } from "@/features/dashboard/TrendChart";
 import { PlatformCompare } from "@/features/dashboard/PlatformCompare";
 import { StoreSection } from "@/features/dashboard/StoreSection";
+import { DashboardViewToggle, PlatformDashboard, type DashboardView } from "@/features/dashboard/PlatformDashboard";
+import { label as dashboardPlatformLabel } from "@/features/dashboard/dashboardMetrics";
 import { SignalBadges } from "@/features/dashboard/SignalBadges";
-import { InsightPanel } from "@/features/insight/InsightPanel";
+import { FloatingInsight } from "@/features/insight/FloatingInsight";
+import { FloatingChat } from "@/features/insight/FloatingChat";
 import { ChatPanel, type ChatMessage } from "@/features/insight/ChatPanel";
 import { ModeSelect } from "@/features/mode/ModeSelect";
 import { ModeToggle } from "@/features/mode/ModeToggle";
 import type { AnalysisMode } from "@/features/mode/mode";
+import { Hero, LandingDetails } from "@/features/landing/Landing";
+import { MarketOrbit } from "@/features/landing/MarketOrbit";
+import { ThemeToggle } from "@/features/theme/ThemeToggle";
 
 type Status = "idle" | "uploading" | "analyzing" | "done" | "error";
 
@@ -33,6 +39,8 @@ export default function Home() {
   const [chatPending, setChatPending] = useState(false);
   // 분석 유형은 첫 분석 결과가 나온 뒤 고른다. 표시만 바꾸므로 바꿔도 API 를 다시 부르지 않는다 (#29).
   const [mode, setMode] = useState<AnalysisMode | null>(null);
+  const [dashboardView, setDashboardView] = useState<DashboardView>("simple");
+  const [collapsedPlatforms, setCollapsedPlatforms] = useState<Record<string, boolean>>({});
   // 마지막으로 성공한 분석의 입력. 파일·월을 바꿔도 화면 결과와 질문이 같은 기준을 쓰도록 질문은 이 스냅샷으로 보낸다.
   const [analyzed, setAnalyzed] = useState<{ files: File[]; periods: Record<string, string> } | null>(null);
   const nextId = useRef(0);
@@ -90,8 +98,9 @@ export default function Home() {
       const res = await analyzeFiles(snapshot.files, undefined, snapshot.periods);
       if (seq !== analyzeSeq.current) return;
       setResult(res);
-      // 파일 구성이 바뀌면 이전 모드가 맞지 않을 수 있어 다시 고르게 한다. 같은 파일 재시도는 모드를 유지한다.
-      if (analyzed && snapshot.files !== analyzed.files) setMode(null);
+      setCollapsedPlatforms({});
+      // 새 대시보드는 바로 요약을 표시하고, 구버전 응답만 유형을 고르게 한다. 같은 파일 재시도는 모드를 유지한다.
+      if (!mode || (analyzed && snapshot.files !== analyzed.files)) setMode(res.dashboard ? "sales" : null);
       setAnalyzed(snapshot);
       // 분석 기준이 바뀌었으므로 이전 기준의 대화는 비운다.
       setMessages([]);
@@ -136,16 +145,22 @@ export default function Home() {
     result.comparison.by_platform.every((p) => p.platform === "naver_store");
 
   return (
-    <main className="page">
-      <header className="header">
-        <div>
-          <h1>Seller Insight AI</h1>
-          <p className="muted">멀티플랫폼 판매·광고 성과 대시보드</p>
+    <main className={`page${result ? " has-summary-fab" : ""}`}>
+      <div className="glow" aria-hidden />
+      <header className="topnav">
+        <div className="brand">
+          <span className="brand-name">Seller Insight AI</span>
         </div>
-        {USE_MOCK && <span className="badge">Mock 데이터 모드</span>}
+        <div className="topnav-right">
+          {USE_MOCK && <span className="badge">Mock 데이터 모드</span>}
+          <ThemeToggle />
+        </div>
       </header>
 
+      <div className={!result ? "landing-stage" : "upload-stage"}>
+      {!result && <><MarketOrbit /><Hero /></>}
       <UploadPanel
+        hero={!result}
         files={files}
         previews={previews}
         busy={busy}
@@ -156,6 +171,7 @@ export default function Home() {
         onFilesChange={handleFilesChange}
         onAnalyze={runAnalyze}
       />
+      </div>
 
       {error && (
         <div className="notice error" role="alert">
@@ -182,28 +198,29 @@ export default function Home() {
         <div className={`results${status === "analyzing" ? " is-stale" : ""}`}>
           <div className="filter-row card">
             <span className="chip">전체 플랫폼</span>
-            {result.comparison.by_platform.map((p) => (
+            {result.dashboard ? result.dashboard.platforms.map((p) => <span key={p.platform} className="chip">{dashboardPlatformLabel(p)}</span>) : result.comparison.by_platform.map((p) => (
               <span key={p.platform} className="chip">
                 {platformLabel(p.platform)}
               </span>
             ))}
             <span className="grow" />
-            <ModeToggle mode={mode} onChange={setMode} />
+            {result.dashboard && <DashboardViewToggle value={dashboardView} onChange={setDashboardView} />}
+            {(!result.dashboard || dashboardView === "detailed") && <ModeToggle mode={mode} onChange={setMode} />}
             {periodLabel && <span className="chip">{periodLabel}</span>}
-            <span className="muted small">업로드 파일 {files.length}개</span>
+            <span className="muted small">분석한 파일 {analyzed?.files.length ?? files.length}개</span>
           </div>
 
-          {mode === "ad" && storeOnly && (
+          {!result.dashboard && mode === "ad" && storeOnly && (
             <div className="notice warn">
               광고 리포트가 없어요. 쿠팡·네이버 광고 파일을 함께 올리거나 매출 분석으로 전환해 주세요.
             </div>
           )}
-          <KpiCards kpis={result.kpis} mode={mode} />
+          {result.dashboard ? <PlatformDashboard data={result.dashboard} view={dashboardView} mode={mode} collapsed={collapsedPlatforms} onToggle={(p) => setCollapsedPlatforms((prev) => ({ ...prev, [p]: !prev[p] }))} /> : <KpiCards kpis={result.kpis} mode={mode} />}
           <SignalBadges signals={result.signals} />
-          {mode === "sales" && result.store && <StoreSection store={result.store} />}
+          {!result.dashboard && mode === "sales" && result.store && <StoreSection store={result.store} />}
 
           <p className="muted small">AI는 선택한 화면 모드와 무관하게 업로드된 전체 데이터 기준으로 답합니다.</p>
-          <div className="main-row">
+          {!result.dashboard && (
             <div className="left-col">
               {!(mode === "ad" && storeOnly) && (
                 <>
@@ -211,27 +228,35 @@ export default function Home() {
                   <PlatformCompare data={result.comparison.by_platform} mode={mode} />
                 </>
               )}
-              {mode === "ad" && result.store && <StoreSection store={result.store} />}
+              {!result.dashboard && mode === "ad" && result.store && <StoreSection store={result.store} />}
             </div>
-            <InsightPanel insight={result.insight} onRetry={runAnalyze} />
-          </div>
+          )}
         </div>
       )}
 
-      <ChatPanel
-        messages={messages}
-        pending={chatPending}
-        disabled={!result || !mode || status === "analyzing"}
-        disabledReason={
-          status === "analyzing"
-            ? "분석 중이에요. 분석이 끝나면 질문할 수 있어요."
-            : result && !mode
-              ? "분석 유형을 고르면 질문할 수 있어요."
-              : undefined
-        }
-        onSend={sendQuestion}
-        onReset={() => setMessages([])}
-      />
+      {!result && status !== "analyzing" && <LandingDetails />}
+
+      {result && (
+        <div className="ai-fab-stack">
+        <FloatingChat pending={chatPending} stale={inputsChanged}>
+        <ChatPanel
+          messages={messages}
+          pending={chatPending}
+          disabled={!mode || status === "analyzing"}
+          disabledReason={
+            status === "analyzing"
+              ? "분석 중이에요. 분석이 끝나면 질문할 수 있어요."
+              : !mode
+                ? "분석 유형을 고르면 질문할 수 있어요."
+                : undefined
+          }
+          onSend={sendQuestion}
+          onReset={() => setMessages([])}
+        />
+        </FloatingChat>
+        {mode && <FloatingInsight insight={result.insight} period={periodLabel ?? result.kpis.period} busy={status === "analyzing"} stale={inputsChanged} onRetry={runAnalyze} />}
+        </div>
+      )}
     </main>
   );
 }

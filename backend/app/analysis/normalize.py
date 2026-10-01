@@ -19,6 +19,7 @@ import pandas as pd
 
 from app.core.errors import AppError
 from app.analysis.diagnosis_sources import attach_sources, capture_source
+from app.analysis.dashboard import capture_dashboard_source
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +118,7 @@ class _Parsed:
     product_ids: list[str]
     product_names: list[str]
     metrics: dict[str, list[int | float]]  # 원본 컬럼명 → 숫자로 바꾼 값
-    observed: dict[str, list[bool]]  # 진단 전용: 실제 0과 빈 셀/대시를 구분한다
+    observed: dict[str, list[bool]]  # 실제 0과 빈 셀/대시를 구분한다
 
     @property
     def metric_columns(self) -> list[str]:
@@ -371,6 +372,7 @@ def normalize_files(files: list[tuple[str, bytes]], periods: dict[str, str] | No
     periods = periods or {}
     frames = []
     diagnosis_rows = []
+    dashboard_sources = []
     for filename, content in files:
         parsed = _parse(filename, content)
         if not all(parsed.periods):
@@ -384,6 +386,7 @@ def normalize_files(files: list[tuple[str, bytes]], periods: dict[str, str] | No
                 )
             parsed.periods = [p or given for p in parsed.periods]
         diagnosis_rows.extend(capture_source(parsed))
+        dashboard_sources.extend(capture_dashboard_source(parsed))
         values = {field: [int(round(v)) for v in parsed.metrics[column]] for field, column in parsed.field_map.items()}
         frame = pd.DataFrame(
             {
@@ -410,6 +413,7 @@ def normalize_files(files: list[tuple[str, bytes]], periods: dict[str, str] | No
     else:
         df = df[NORMALIZED_COLUMNS]
     df = df.sort_values(["period", "platform", "product_id"], kind="stable").reset_index(drop=True)
+    df.attrs["dashboard_sources"] = dashboard_sources
     return attach_sources(df, diagnosis_rows)
 
 

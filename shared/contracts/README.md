@@ -180,3 +180,15 @@ B 의 `routers/preview.py`, `routers/analyze.py` 가 아래 함수를 호출한�
 - `required_conditions`는 `revenue_up`, `ad_spend_down`, `ad_spend_up`, `ad_revenue_down`, `ad_revenue_not_up`, `roas_down`의 목록으로, 모두 만족하는 후보만 반환한다. 기본 개수 5, 허용 1~50이다.
 - 후보 없음은 `ok` + `answer=[]`. `DIAGNOSIS_INSUFFICIENT_PERIODS`, `DIAGNOSIS_NO_COMPARABLE_PRODUCTS`, `DIAGNOSIS_INSUFFICIENT_METRICS`, `DIAGNOSIS_SOURCE_MISMATCH`는 기존 라우터가 `unsupported_question` 안내로 변환한다(HTTP 오류 코드 추가 아님).
 - 점수·동점 순서·중앙값 모집단·결측/기간 처리의 상세 기준과 테스트는 [PRODUCT_DIAGNOSIS.md](../../DevelopDoc/PRODUCT_DIAGNOSIS.md)에 정리했다.
+
+## 플랫폼 대시보드 선택 응답
+
+`AnalyzeResponse.dashboard`는 선택적 추가 필드다. 기존 `kpis`, `comparison`, `rows`, `store`, `signals`, `insight`의 구조와 계산은 유지한다. 출처 정보가 없는 내부 대역에서는 null이며, 프런트는 필드가 없거나 null이면 기존 화면으로 돌아간다. 공개 타입은 `schemas.Dashboard`와 `frontend/types/api.ts`의 `Dashboard`에 대응한다.
+
+- 최상위 `period`는 `kpis.period`, `previous_period`는 자료 존재와 무관하게 달력상 전월이다. 기존 `kpis.previous_period`의 자료 없을 때 null 규칙과 혼동하지 않는다.
+- `platforms[]`: `platform`은 `coupang | naver`이며 순서는 쿠팡부터 고정. `naver_store`는 표시용 네이버 그룹으로 묶되 원자료 정의는 유지한다. 기준 월이 없는 플랫폼도 `periods`(실제 업로드 월)와 함께 포함한다.
+- `current`, `previous`, `trend[]`는 `{period, has_data, has_sales, has_ads, values, store_values}`. `values`에는 매출·주문·판매량·광고비·광고매출·ROAS, `store_values`에는 스마트스토어 합계·비율이 들어간다. 파일 유무는 금액이 0인지로 판단하지 않는다.
+- 값은 `number | null`. 파일/필드 없음, 해당 필드를 가진 원본 행 중 빈 값/대시가 있음, 유효하지 않은 비율 분모는 null. 실제 관측한 0은 0이다. `change`, `store_change`는 같은 지표 키로 증감을 제공한다. 비율은 %p, 그 외는 %. 전월 없음·전월 값 0 등 계산 불가는 null이다.
+- `has_store`는 SALES 자료 존재, `overlap_excluded`는 기준 월 SALES가 기존 네이버 통합 템플릿과 겹쳐 플랫폼 요약에서 제외됐는지 표시한다. `store_values`는 제외와 무관하게 SALES 상세 자체를 보여 준다.
+- `products[]`는 `{source, sort_key, total, items}`. `items[]`는 `{product_id, product_name, values, change}`이며 자료 종류별 최대 10개. `source`는 `coupang_export | template | smartstore_sales | naver_ads`. 쿠팡 원본 옵션 ID만 판매/광고를 결합하고 네이버 소재/판매 상품은 분리한다.
+- 이 블록은 대시보드 표시 전용이다. AI 입력·계산 정책을 바꾸거나 프런트에서 새 LLM 요청을 만들지 않는다. 상세 동작과 한계는 `DevelopDoc/DASHBOARD_VIEWS.md` 참고.

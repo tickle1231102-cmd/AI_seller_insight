@@ -107,6 +107,13 @@ def test_empty_candidates_are_valid_not_llm_failure():
     plan, _ = diagnosis("판매는 오르는데 광고를 덜 쓰고 있는 상품")
     result = create_insight({}, {}, [], plan=plan, answer=[], llm=MustNotCall())
     assert result.status == "ok" and result.answer == [] and "없습니다" in result.summary
+    assert "기회 상품 후보가 없습니다" in result.summary
+
+
+def test_empty_attention_candidates_use_correct_particle():
+    plan, _ = diagnosis("관리할 상품")
+    result = create_insight({}, {}, [], plan=plan, answer=[], llm=MustNotCall())
+    assert "관리 필요 상품이 없습니다" in result.summary
 
 
 @pytest.mark.parametrize("question", ["판매 추세로 볼 때 저평가된 상품은?", "주목하고 관리해야 할 상품은?",
@@ -118,7 +125,9 @@ def test_real_api_composite_flow_preserves_kpis_and_existing_contract(monkeypatc
         response = client.post("/api/analyze", files=[("files", f) for f in uploads()], data={"question": question})
     assert response.status_code == 200, response.text
     body = response.json()
-    assert set(body) == {"kpis", "comparison", "rows", "signals", "insight", "store"}
+    assert set(body) == {"kpis", "comparison", "rows", "signals", "insight", "store", "dashboard"}
+    assert body["dashboard"] is not None
+    assert sum(p["current"]["values"]["revenue"] for p in body["dashboard"]["platforms"]) == 3300
     assert body["kpis"]["current"]["revenue"] == 3300
     insight = body["insight"]
     assert insight["status"] == "ok" and insight["plan"]["analysis_type"] == "product_diagnosis"

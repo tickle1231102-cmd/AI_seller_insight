@@ -99,6 +99,7 @@ export function ChatPanel({ messages, pending, disabled, disabledReason, onSend,
         }}
       >
         <input
+          aria-label="AI에게 질문"
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={(disabled && disabledReason) || "판매·광고 데이터에 대해 질문해보세요..."}
