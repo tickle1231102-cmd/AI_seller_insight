@@ -88,6 +88,8 @@ export default function Home() {
       const res = await analyzeFiles(snapshot.files, undefined, snapshot.periods);
       if (seq !== analyzeSeq.current) return;
       setResult(res);
+      // 파일 구성이 바뀌면 이전 모드가 맞지 않을 수 있어 다시 고르게 한다. 같은 파일 재시도는 모드를 유지한다.
+      if (analyzed && snapshot.files !== analyzed.files) setMode(null);
       setAnalyzed(snapshot);
       // 분석 기준이 바뀌었으므로 이전 기준의 대화는 비운다.
       setMessages([]);
@@ -125,7 +127,10 @@ export default function Home() {
       : result.kpis.period
     : null;
   // 광고 리포트 없이 스마트스토어만 올린 경우. 광고비 0 은 정상 광고 데이터에도 있어 플랫폼으로 판단한다.
-  const storeOnly = !!result && result.comparison.by_platform.every((p) => p.platform === "naver_store");
+  const storeOnly =
+    !!result &&
+    result.comparison.by_platform.length > 0 &&
+    result.comparison.by_platform.every((p) => p.platform === "naver_store");
 
   return (
     <main className="page">
@@ -185,13 +190,12 @@ export default function Home() {
             <span className="muted small">업로드 파일 {files.length}개</span>
           </div>
 
-          {mode === "ad" && storeOnly ? (
+          {mode === "ad" && storeOnly && (
             <div className="notice warn">
               광고 리포트가 없어요. 쿠팡·네이버 광고 파일을 함께 올리거나 매출 분석으로 전환해 주세요.
             </div>
-          ) : (
-            <KpiCards kpis={result.kpis} mode={mode} />
           )}
+          <KpiCards kpis={result.kpis} mode={mode} />
           <SignalBadges signals={result.signals} />
           {mode === "sales" && result.store && <StoreSection store={result.store} />}
 
