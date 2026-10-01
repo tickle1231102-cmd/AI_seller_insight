@@ -95,20 +95,20 @@
 - **담당:** A · **리뷰:** B
 
 **완료 조건**
-- [ ] 여러 `.xlsx`/`.csv` 파일을 한 번에 선택 가능
-- [ ] 선택된 파일 목록(파일명, 크기) 표시, 개별 삭제 가능
-- [ ] 허용되지 않은 확장자는 선택 단계에서 안내
-- [ ] 미리보기 표 컴포넌트가 mock 데이터(계약 예시 JSON)로 렌더링
+- [x] 여러 `.xlsx`/`.csv` 파일을 한 번에 선택 가능 (`UploadPanel.tsx`, 드래그·클릭 모두, PR #1)
+- [x] 선택된 파일 목록(파일명, 크기) 표시, 개별 삭제 가능 (PR #1)
+- [x] 허용되지 않은 확장자는 선택 단계에서 안내 (`client.ts` `ALLOWED_EXTENSIONS` 검사, 서버 호출 전)
+- [x] 미리보기 표 컴포넌트가 mock 데이터(계약 예시 JSON)로 렌더링 (`lib/api/mock.ts`, 실제 API 로도 확인)
 
 ### WU-FE-02 KPI 대시보드 UI
 - **담당:** A · **리뷰:** B
 
 **완료 조건**
-- [ ] KPI 카드 6개 (매출, 주문, 판매량, 광고비, 광고매출, ROAS) 렌더링
-- [ ] 전월 대비 변화 표시, 증가/감소 색상 구분, ROAS는 `%p` 표기
-- [ ] 금액 천 단위 콤마 + `원` 표기
-- [ ] 계약 예시 JSON(mock)으로 전체 화면 렌더링 확인
-- [ ] 값이 `null` 인 경우 `-` 로 표시
+- [x] KPI 카드 6개 (매출, 주문, 판매량, 광고비, 광고매출, ROAS) 렌더링 (`KpiCards.tsx`)
+- [x] 전월 대비 변화 표시, 증가/감소 색상 구분, ROAS는 `%p` 표기
+- [x] 금액 천 단위 콤마 + `원` 표기 (`lib/format.ts`)
+- [x] 계약 예시 JSON(mock)으로 전체 화면 렌더링 확인
+- [x] 값이 `null` 인 경우 `-` 로 표시 (포맷 함수 기준, TEST_RESULTS 5장)
 
 ### WU-BE-01 FastAPI 서버 · 설정 · CORS
 - **담당:** B · **리뷰:** C
@@ -161,19 +161,19 @@
 ### WU-AI-01 LLM 클라이언트 · 실패 처리
 - **담당:** D · **리뷰:** A
 
-> #18 A 최종 승인/main ff214c2 병합 및 실제 main 비유료 493개 확인 후 D 서버 기능만 체크했다. #22 문서/opt-in 후속과 새 배포 UI/E2E는 별도 대기다. 실제 API 결과는 동일 AI 구현 29a90ea에서 실행한 기록이며 최신 단일 기준은 `D_WEDNESDAY_STATUS.md`다.
+> 10/1 main657d7ce + D 문서 갱신본(실행 코드 동일) 비유료533개/유료 opt-in10개 제외를 확인했다. 실제 유료 API 평가는29a90ea 과거 기록이다. #34는 자유 생성 제거·서버 고정 인사로 보완·병합됐다. 배포ffe31fb와 #42be35ce4 로컬 QA는 구분하며 분석 스냅샷/응답 교차 보완은 재검증·D 승인했다. 최신 전체 배포/팀 판정은 대기하고 기준은 `D_WEDNESDAY_STATUS.md`다.
 
 **완료 조건**
 - [x] `ai/` 내 LLM 호출 함수가 API 키를 환경변수로만 읽음 (`OPENAI_API_KEY` 우선, `LLM_API_KEY` 호환; 실제 키는 커밋하지 않음)
 - [x] 호출 1회당 타임아웃 적용 (`LLM_TIMEOUT_SECONDS`, 기본 30초 — 최신 TECH_SPEC과 일치)
 - [x] JSON 파싱/검증 실패 시 1회 재시도 후 `llm_error` 반환 (`test_structured_client_retries_invalid_output_once`)
 - [x] API 키 없음·네트워크 오류 시 예외가 밖으로 새지 않고 `llm_error` 반환 (`test_missing_api_key_is_normalized`, `test_structured_client_normalizes_provider_failure`)
-- [x] 실패 경로를 모킹한 테스트 통과 (실제 main 493 passed/9 deselected, #22 통합 493 passed/10 deselected)
+- [x] 실패 경로를 모킹한 테스트 통과 (main657d7ce 실행 코드와 동일한 D 문서 갱신본 비유료533 passed/10 deselected)
 
 ### WU-AI-02 질문 → 분석 계획 JSON (Planner)
 - **담당:** D · **리뷰:** A
 
-> #18 A 승인/main 반영 및 실제 main 회귀 확인 완료. 유료40문항은 동일 AI 구현 29a90ea의 기록이며 새 배포 UI는 별도다.
+> #18 A 승인/main 반영 및10/1 비유료 회귀 확인 완료. 유료40문항은29a90ea의 과거 기록이며 최신 실행과 합산하지 않는다. #34의 고정 인사 경로는 추가 LLM 없이 응답하고 일반 데이터 질문은 기존 Planner를 사용한다.
 
 **완료 조건**
 - [x] `planner.py` 가 질문 → `AnalysisPlan` (`metric`, `group_by`, `sort`, `limit`, `period`) 반환
@@ -233,39 +233,39 @@
 - **담당:** A · **리뷰:** B
 
 **완료 조건**
-- [ ] `lib/api/` 에 `preview`, `analyze` 클라이언트 함수 (`NEXT_PUBLIC_API_BASE_URL` 사용)
-- [ ] `types/` 의 응답 타입이 계약과 일치
-- [ ] 업로드 → `/api/preview` 결과로 파일 목록·플랫폼·기간·미리보기 표시
-- [ ] 분석 버튼 → `/api/analyze` 결과로 KPI 카드 표시
-- [ ] mock 데이터 의존 코드 제거
+- [x] `lib/api/` 에 `preview`, `analyze` 클라이언트 함수 (`NEXT_PUBLIC_API_BASE_URL` 사용, `client.ts`)
+- [x] `types/` 의 응답 타입이 계약과 일치 (`types/api.ts`)
+- [x] 업로드 → `/api/preview` 결과로 파일 목록·플랫폼·기간·미리보기 표시 (10/1 배포 화면, fixture 4개)
+- [x] 분석 버튼 → `/api/analyze` 결과로 KPI 카드 표시 (10/1 배포 화면: 매출 12,600,000원 +21.2%, ROAS 312.5% −14.2%p — `expected_kpis.json` 일치)
+- [ ] mock 데이터 의존 코드 제거 — ⏳ 실제 API 경로는 mock 을 쓰지 않지만, `NEXT_PUBLIC_API_BASE_URL` 이 비었을 때 쓰는 mock 대체 모드(`lib/api/mock.ts`)는 남겨 둠. 제거할지 조건 문구를 바꿀지 팀 판단 필요
 
 ### WU-FE-04 차트 (플랫폼 비교 · 추이)
 - **담당:** A · **리뷰:** B
 
 **완료 조건**
-- [ ] Recharts 플랫폼 비교 차트 (`comparison.by_platform` 의 매출·ROAS)
-- [ ] Recharts 기간 추이 차트 (`comparison.trend` 의 매출·ROAS)
-- [ ] 툴팁에 포맷된 값 표시
-- [ ] 데이터가 한 기간뿐이어도 오류 없이 표시
-- [ ] 이상 신호(`signals`) 배지 표시
+- [x] Recharts 플랫폼 비교 차트 (`comparison.by_platform` 의 매출·ROAS, `PlatformCompare.tsx`)
+- [x] Recharts 기간 추이 차트 (`comparison.trend` 의 매출·ROAS, `TrendChart.tsx`)
+- [x] 툴팁에 포맷된 값 표시 (`formatWon`·`formatPercent`)
+- [x] 데이터가 한 기간뿐이어도 오류 없이 표시
+- [x] 이상 신호(`signals`) 배지 표시 (`SignalBadges.tsx`, 배포 화면에서 `광고비 +28.0% 증가, ROAS -14.2%p` 확인)
 
 ### WU-FE-05 AI 질문 · 인사이트 UI
 - **담당:** A · **리뷰:** B
 
 **완료 조건**
-- [ ] 질문 입력창 (300자 제한, 글자 수 표시) 및 예시 질문 버튼
-- [ ] `summary`, `evidence`, `checks`, `actions`, `limitations` 가 구분된 섹션으로 표시
-- [ ] `answer` 결과 표 표시
-- [ ] `insight.status` 별 처리: `unsupported_question` → 예시 안내, `llm_error` → 재시도 안내 (KPI 영역은 유지)
+- [x] 질문 입력창 (300자 제한, 글자 수 표시) 및 예시 질문 버튼 (`ChatPanel.tsx`, PR #1)
+- [x] `summary`, `evidence`, `checks`, `actions`, `limitations` 가 구분된 섹션으로 표시 (`InsightBody.tsx`)
+- [x] `answer` 결과 표 표시 (`InsightBody.tsx::AnswerTable`)
+- [x] `insight.status` 별 처리: `unsupported_question` → 예시 안내, `llm_error` → 재시도 안내 (KPI 영역은 유지) (서버 limitations 표시 #23, `llm_error` 모의 확인 TEST_RESULTS 6장)
 
 ### WU-FE-06 로딩 · 오류 · 반응형
 - **담당:** A · **리뷰:** B
 
 **완료 조건**
-- [ ] 업로드·분석·AI 응답 중 로딩 표시, 중복 요청 방지 (버튼 비활성화)
-- [ ] 오류 코드별 사용자 메시지 표시 (최소 `FILE_TOO_LARGE`, `TOO_MANY_FILES`, `MISSING_COLUMNS`, `INVALID_NUMBER`, `EMPTY_FILE`, 네트워크 오류)
-- [ ] 모바일 폭(375px)에서 가로 스크롤 없이 주요 화면 확인 가능
-- [ ] 콘솔 에러 없음
+- [x] 업로드·분석·AI 응답 중 로딩 표시, 중복 요청 방지 (버튼 비활성화) (`확인 중...`·`분석 중...`, 처리 중 버튼 `disabled`)
+- [x] 오류 코드별 사용자 메시지 표시 (최소 `FILE_TOO_LARGE`, `TOO_MANY_FILES`, `MISSING_COLUMNS`, `INVALID_NUMBER`, `EMPTY_FILE`, 네트워크 오류) (`client.ts` 문구 표 + `UNREADABLE_FILE` #25, 배포 화면 확인 TEST_RESULTS 3장)
+- [x] 모바일 폭(375px)에서 가로 스크롤 없이 주요 화면 확인 가능 (10/1 배포 화면, 375×812 에뮬레이션: fixture 4개 업로드 → 분석 → KPI·차트·신호·인사이트까지 페이지 `scrollWidth` 375 = 화면 폭. 플랫폼 비교 표만 자기 영역 안에서 가로 스크롤(`.table-wrap`). 실제 휴대폰 기기로는 확인하지 못함)
+- [x] 콘솔 에러 없음 (10/1 배포 화면, 위 흐름에서 콘솔 오류 0건)
 
 ### WU-BE-05 오류 처리 통일
 - **담당:** B · **리뷰:** C
@@ -284,12 +284,12 @@
 - **담당:** D · **리뷰:** A
 
 **완료 조건**
-> #18 A 승인/main 반영 및 실제 main 품질 회귀 확인 완료. 최신 문서/활용 사례의 main 반영은 #22 A 리뷰·병합 대기다.
+> #18/#22 A 승인·병합 및10/1 main 코드 비유료533개 품질 회귀 확인 완료. 배포 ffe31fb의 정상·미지원·AI 상태 모의 UI와 #42 로컬 QA는 검증 범위를 구분해 기록했다. #42(d295f3a) 및 A 승인 후 #37 D 완료 근거 갱신(3b5bc89)은 main 병합 완료이며 최신 전체 배포/팀 최종 승인은 별도다.
 - [x] 인사이트 품질 테스트 최소 5개 이상 구성 (`test_insight_safety.py`, `test_insight_number_grounding.py`, `ai_quality_runner.py`의 실제 인사이트 9개 시나리오)
 - [x] 검증한 시나리오에서 사실 문장은 서버가 검증된 계산값으로 생성하고 호출자의 `plan`/`answer`를 보존 (숫자 변조 0건; 모든 임의 입력의 정확도 보장 아님)
 - [x] 광고 소재·CTR·CPC·CVR·경쟁사·시장 상황 등 입력에 없는 원인을 모델이 단정문으로 생성하는 경로 제거 (허용되지 않은 자유 문장/ID 차단)
 - [x] 필요한 추가 데이터와 현재 확인 불가 범위를 서버의 `limitations`에 기술 (단일 월, ROAS 계산 불가, 불연속 월, 신호 없음 포함)
-- [ ] 최신 테스트 결과와 AI 활용 사례를 `DevelopDoc/AI_RELIABILITY_IMPROVEMENTS.md`, `AI_INSIGHT_SAFETY_TEST_REPORT.md`, `AI_USAGE_CASES.md`에 기록하고 main 반영 (#22 준비 완료, A 리뷰·병합 대기)
+- [x] 테스트 결과와 AI 활용 사례를 `DevelopDoc/AI_RELIABILITY_IMPROVEMENTS.md`, `AI_INSIGHT_SAFETY_TEST_REPORT.md`, `AI_USAGE_CASES.md`에 기록하고 main 반영 (#18/#22 A 승인·병합 완료; 이번 완료 근거 갱신은 후속 PR)
 
 ### WU-DA-06 데이터 · 실패 케이스 QA
 - **담당:** C · **리뷰:** D
