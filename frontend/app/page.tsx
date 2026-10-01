@@ -149,7 +149,6 @@ export default function Home() {
       <div className="glow" aria-hidden />
       <header className="topnav">
         <div className="brand">
-          <span className="brand-mark" aria-hidden>✦</span>
           <span className="brand-name">Seller Insight AI</span>
         </div>
         <div className="topnav-right">

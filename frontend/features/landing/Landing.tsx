@@ -1,14 +1,10 @@
 export function Hero() {
   return (
     <section className="hero">
-      <span className="hero-pill">
-        <i aria-hidden />
-        쿠팡 · 네이버 리포트를 AI가 한 번에 분석
-      </span>
       <h1 className="hero-title">
         흩어진 판매·광고 데이터,
         <br />
-        파일 하나로 인사이트까지
+        <span className="hero-highlight">파일 하나로 인사이트까지</span>
       </h1>
       <p className="hero-sub">
         엑셀·CSV 리포트를 올리면 KPI, 플랫폼 비교, 이상 신호와 AI 액션 제안을{" "}
