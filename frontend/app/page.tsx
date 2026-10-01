@@ -9,6 +9,8 @@ import { KpiCards } from "@/features/dashboard/KpiCards";
 import { TrendChart } from "@/features/dashboard/TrendChart";
 import { PlatformCompare } from "@/features/dashboard/PlatformCompare";
 import { StoreSection } from "@/features/dashboard/StoreSection";
+import { DashboardViewToggle, PlatformDashboard, type DashboardView } from "@/features/dashboard/PlatformDashboard";
+import { label as dashboardPlatformLabel } from "@/features/dashboard/dashboardMetrics";
 import { SignalBadges } from "@/features/dashboard/SignalBadges";
 import { InsightPanel } from "@/features/insight/InsightPanel";
 import { ChatPanel, type ChatMessage } from "@/features/insight/ChatPanel";
@@ -33,6 +35,8 @@ export default function Home() {
   const [chatPending, setChatPending] = useState(false);
   // 분석 유형은 첫 분석 결과가 나온 뒤 고른다. 표시만 바꾸므로 바꿔도 API 를 다시 부르지 않는다 (#29).
   const [mode, setMode] = useState<AnalysisMode | null>(null);
+  const [dashboardView, setDashboardView] = useState<DashboardView>("simple");
+  const [collapsedPlatforms, setCollapsedPlatforms] = useState<Record<string, boolean>>({});
   // 마지막으로 성공한 분석의 입력. 파일·월을 바꿔도 화면 결과와 질문이 같은 기준을 쓰도록 질문은 이 스냅샷으로 보낸다.
   const [analyzed, setAnalyzed] = useState<{ files: File[]; periods: Record<string, string> } | null>(null);
   const nextId = useRef(0);
@@ -90,6 +94,7 @@ export default function Home() {
       const res = await analyzeFiles(snapshot.files, undefined, snapshot.periods);
       if (seq !== analyzeSeq.current) return;
       setResult(res);
+      setCollapsedPlatforms({});
       // 파일 구성이 바뀌면 이전 모드가 맞지 않을 수 있어 다시 고르게 한다. 같은 파일 재시도는 모드를 유지한다.
       if (analyzed && snapshot.files !== analyzed.files) setMode(null);
       setAnalyzed(snapshot);
@@ -182,28 +187,30 @@ export default function Home() {
         <div className={`results${status === "analyzing" ? " is-stale" : ""}`}>
           <div className="filter-row card">
             <span className="chip">전체 플랫폼</span>
-            {result.comparison.by_platform.map((p) => (
+            {result.dashboard ? result.dashboard.platforms.map((p) => <span key={p.platform} className="chip">{dashboardPlatformLabel(p)}</span>) : result.comparison.by_platform.map((p) => (
               <span key={p.platform} className="chip">
                 {platformLabel(p.platform)}
               </span>
             ))}
             <span className="grow" />
             <ModeToggle mode={mode} onChange={setMode} />
+            {result.dashboard && <DashboardViewToggle value={dashboardView} onChange={setDashboardView} />}
             {periodLabel && <span className="chip">{periodLabel}</span>}
-            <span className="muted small">업로드 파일 {files.length}개</span>
+            <span className="muted small">분석한 파일 {analyzed?.files.length ?? files.length}개</span>
           </div>
 
-          {mode === "ad" && storeOnly && (
+          {!result.dashboard && mode === "ad" && storeOnly && (
             <div className="notice warn">
               광고 리포트가 없어요. 쿠팡·네이버 광고 파일을 함께 올리거나 매출 분석으로 전환해 주세요.
             </div>
           )}
-          <KpiCards kpis={result.kpis} mode={mode} />
+          {result.dashboard ? <PlatformDashboard data={result.dashboard} view={dashboardView} mode={mode} collapsed={collapsedPlatforms} onToggle={(p) => setCollapsedPlatforms((prev) => ({ ...prev, [p]: !prev[p] }))} /> : <KpiCards kpis={result.kpis} mode={mode} />}
           <SignalBadges signals={result.signals} />
-          {mode === "sales" && result.store && <StoreSection store={result.store} />}
+          {!result.dashboard && mode === "sales" && result.store && <StoreSection store={result.store} />}
 
           <p className="muted small">AI는 선택한 화면 모드와 무관하게 업로드된 전체 데이터 기준으로 답합니다.</p>
-          <div className="main-row">
+          <div className={result.dashboard ? "" : "main-row"}>
+            {!result.dashboard && (
             <div className="left-col">
               {!(mode === "ad" && storeOnly) && (
                 <>
@@ -211,8 +218,9 @@ export default function Home() {
                   <PlatformCompare data={result.comparison.by_platform} mode={mode} />
                 </>
               )}
-              {mode === "ad" && result.store && <StoreSection store={result.store} />}
+              {!result.dashboard && mode === "ad" && result.store && <StoreSection store={result.store} />}
             </div>
+            )}
             <InsightPanel insight={result.insight} onRetry={runAnalyze} />
           </div>
         </div>

@@ -298,6 +298,37 @@ td { padding: 10px; border-top: 1px solid var(--border); white-space: nowrap; }
 }
 
 /* 분석 유형 (#29) */
+.platform-dashboard { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.dashboard-total { display: flex; flex-direction: column; gap: 10px; }
+.dashboard-total-values { display: flex; flex-wrap: wrap; gap: 16px 36px; }
+.dashboard-total-values > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+.dashboard-total-values strong { font-size: 24px; overflow-wrap: anywhere; }
+.platform-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.platform-grid.detailed { grid-template-columns: minmax(0, 1fr); }
+.platform-section { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.platform-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.platform-heading h2 { font-size: 18px; }
+.platform-heading button { flex-shrink: 0; }
+.platform-primary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.platform-primary .metric-roas { grid-column: 1 / -1; flex-direction: row; align-items: baseline; flex-wrap: wrap; gap: 8px 16px; }
+.platform-primary .kpi-value { font-size: 24px; }
+.platform-note { margin-top: 12px; }
+.platform-details { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 20px; min-width: 0; }
+.platform-details h3 { font-size: 15px; }
+.platform-details .table-wrap { max-width: 100%; }
+.platform-products { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.platform-products th[scope="row"] { max-width: 260px; white-space: normal; overflow-wrap: anywhere; }
+.platform-money-trend { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; }
+.money-month { min-width: 0; background: var(--soft); border-radius: 10px; padding: 14px; }
+.money-line { display: grid; grid-template-columns: 42px minmax(20px, 1fr) auto; gap: 8px; align-items: center; font-size: 12px; margin-top: 8px; }
+.money-track { height: 10px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.money-track > div { height: 100%; background: var(--primary); }
+.money-line.ad_spend .money-track > div { background: var(--purple); }
+.platform-collapsed { font-size: 14px; overflow-wrap: anywhere; }
+.platform-section button:focus-visible, .mode-toggle button:focus-visible, .platform-section .table-wrap:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+@media (max-width: 900px) { .platform-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { .platform-primary { grid-template-columns: minmax(0, 1fr); } .platform-primary .metric-roas { grid-column: auto; } .platform-primary .kpi-value { font-size: 22px; } }
+
 .mode-select { display: flex; flex-direction: column; gap: 8px; }
 .mode-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 8px; }
 .mode-option {
