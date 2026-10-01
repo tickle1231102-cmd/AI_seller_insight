@@ -7,6 +7,7 @@ from pydantic import BaseModel, ValidationError
 
 from .client import LLMClientError, OpenAIStructuredClient
 from .models import PlannerDecision, PlannerResult
+from .diagnosis_policy import diagnosis_plan
 from .question_policy import inspect_question, plan_mismatch
 from .prompts import PLANNER_INSTRUCTIONS
 
@@ -57,6 +58,9 @@ def create_analysis_plan(
             reason="질문은 300자 이하여야 합니다.",
         )
 
+    diagnosis = diagnosis_plan(normalized, periods=periods)
+    if diagnosis is not None:
+        return diagnosis
     requirements = inspect_question(normalized, periods=periods)
     if requirements.reason:
         return PlannerResult(status="unsupported_question", reason=requirements.reason)
