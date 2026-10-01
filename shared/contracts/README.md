@@ -170,6 +170,17 @@ B 의 `routers/preview.py`, `routers/analyze.py` 가 아래 함수를 호출한�
 - 증감 값이 `null` (전월 값 0, ROAS·전환율 분모 0) 인 그룹은 정렬 방향과 상관없이 맨 뒤. 동률은 그룹 키 순. `sort`·`limit` 기본값은 위 표와 같다.
 - 오류는 `STORE_DATA_NOT_FOUND` → `UNSUPPORTED_PLAN` → `PERIOD_NOT_FOUND` → `PREVIOUS_PERIOD_NOT_FOUND` 순으로 검사한다. 모두 HTTP 오류가 아니라 `unsupported_question` 의 `summary` 로 나간다 (3장).
 
+## 6. 복합 상품 진단 (C / D)
+
+기존 `AnalysisPlan`은 유지한다. `create_analysis_plan`이 `analysis_type="product_diagnosis"`인 `ProductDiagnosisPlan`을 반환하면 `run_plan`이 `run_product_diagnosis(df, intent, limit=5, period=None, required_conditions=[])`를 호출한다. `intent`는 `opportunity` 또는 `attention`이다. B 라우터/공개 응답 필드는 그대로이며 `insight.plan`의 객체와 `insight.answer`의 행 배열에 담는다.
+
+- 기준 월(미지정이면 업로드 최신월)과 달력상 전월의 동일 플랫폼·자료 종류·상품 ID만 비교한다. 신규/사라진 상품은 0으로 채우지 않는다.
+- 서버가 점수·순위·`reason_codes`와 수치를 확정하고 D가 검증된 근거 문장으로 표시한다. 이 경로는 LLM을 호출하지 않는다.
+- 쿠팡 판매/광고의 정확히 같은 옵션 ID만 연결한다. 네이버 광고 소재 ID와 스마트스토어 상품 ID는 연결하지 않는다. 원본에 없는 지표·빈 셀은 진단에서 `null`이다. 출처는 내부 DataFrame 메타데이터이며 공개 `rows` 컬럼에는 추가하지 않는다.
+- `required_conditions`는 `revenue_up`, `ad_spend_down`, `ad_spend_up`, `ad_revenue_down`, `ad_revenue_not_up`, `roas_down`의 목록으로, 모두 만족하는 후보만 반환한다. 기본 개수 5, 허용 1~50이다.
+- 후보 없음은 `ok` + `answer=[]`. `DIAGNOSIS_INSUFFICIENT_PERIODS`, `DIAGNOSIS_NO_COMPARABLE_PRODUCTS`, `DIAGNOSIS_INSUFFICIENT_METRICS`, `DIAGNOSIS_SOURCE_MISMATCH`는 기존 라우터가 `unsupported_question` 안내로 변환한다(HTTP 오류 코드 추가 아님).
+- 점수·동점 순서·중앙값 모집단·결측/기간 처리의 상세 기준과 테스트는 [PRODUCT_DIAGNOSIS.md](../../DevelopDoc/PRODUCT_DIAGNOSIS.md)에 정리했다.
+
 ## 플랫폼 대시보드 선택 응답
 
 `AnalyzeResponse.dashboard`는 선택적 추가 필드다. 기존 `kpis`, `comparison`, `rows`, `store`, `signals`, `insight`의 구조와 계산은 유지한다. 출처 정보가 없는 내부 대역에서는 null이며, 프런트는 필드가 없거나 null이면 기존 화면으로 돌아간다. 공개 타입은 `schemas.Dashboard`와 `frontend/types/api.ts`의 `Dashboard`에 대응한다.

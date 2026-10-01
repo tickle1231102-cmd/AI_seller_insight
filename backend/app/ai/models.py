@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 Metric = Literal[
@@ -51,6 +51,18 @@ class AnalysisPlan(BaseModel):
     )
 
 
+class ProductDiagnosisPlan(BaseModel):
+    """Deterministic composite query, carried inside the existing Insight.plan."""
+
+    model_config = ConfigDict(extra="forbid")
+    analysis_type: Literal["product_diagnosis"] = "product_diagnosis"
+    diagnosis_intent: Literal["opportunity", "attention"]
+    limit: int = Field(default=5, ge=1, le=50, strict=True)
+    period: str | None = Field(default=None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
+    required_conditions: list[Literal["revenue_up", "ad_spend_down", "ad_spend_up",
+                                      "ad_revenue_down", "ad_revenue_not_up", "roas_down"]] = Field(default_factory=list)
+
+
 class PlannerDecision(BaseModel):
     """Structured output requested from the LLM before exposing a plan."""
 
@@ -72,7 +84,7 @@ class PlannerResult(BaseModel):
     """Safe result returned to the backend integration layer."""
 
     status: Literal["ok", "unsupported_question", "llm_error"]
-    plan: AnalysisPlan | None = None
+    plan: AnalysisPlan | ProductDiagnosisPlan | None = None
     reason: str | None = None
 
     @model_validator(mode="after")
@@ -114,7 +126,7 @@ class Insight(BaseModel):
     """Safe, display-ready explanation of deterministic analysis results."""
 
     status: Literal["ok", "unsupported_question", "llm_error", "skipped"]
-    plan: AnalysisPlan | None = None
+    plan: AnalysisPlan | ProductDiagnosisPlan | None = None
     answer: list[dict[str, Any]] = Field(default_factory=list)
     summary: str = ""
     evidence: list[str] = Field(default_factory=list)
