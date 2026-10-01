@@ -231,4 +231,38 @@ export interface AnalyzeResponse {
   insight: Insight;
   store?: StoreKpis | null; // 스마트스토어 판매 분석 파일이 없으면 null
   coupang?: CoupangKpis | null; // 쿠팡 판매 분석(옵션별 지표) 파일이 없으면 null
+  dashboard?: Dashboard | null;
+}
+
+export type DashboardValues = Record<string, number | null>;
+export interface DashboardMonth {
+  period: string;
+  has_data: boolean;
+  has_sales: boolean;
+  has_ads: boolean;
+  values: DashboardValues;
+  store_values: DashboardValues;
+}
+export interface DashboardProducts {
+  source: string;
+  sort_key: string;
+  total: number;
+  items: { product_id: string; product_name: string; values: DashboardValues; change: DashboardValues }[];
+}
+export interface DashboardPlatform {
+  platform: "coupang" | "naver";
+  periods: string[];
+  current: DashboardMonth;
+  previous: DashboardMonth;
+  change: DashboardValues;
+  store_change: DashboardValues;
+  has_store: boolean;
+  overlap_excluded: boolean;
+  trend: DashboardMonth[];
+  products: DashboardProducts[];
+}
+export interface Dashboard {
+  period: string;
+  previous_period: string;
+  platforms: DashboardPlatform[];
 }

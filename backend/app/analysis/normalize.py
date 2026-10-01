@@ -18,6 +18,7 @@ from pathlib import Path
 import pandas as pd
 
 from app.core.errors import AppError
+from app.analysis.dashboard import capture_dashboard_source
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +123,7 @@ class _Parsed:
     product_ids: list[str]
     product_names: list[str]
     metrics: dict[str, list[int | float]]  # 원본 컬럼명 → 숫자로 바꾼 값
+    observed: dict[str, list[bool]]  # 실제 0과 빈 셀/대시를 구분한다
     extras: dict[str, list[int | float]] = field(default_factory=dict)  # ExportFormat.extra_map 필드 → 값
 
     @property
@@ -277,6 +279,7 @@ def _parse(filename: str, content: bytes) -> _Parsed:
         periods = [_extract_period(filename)] * len(df)
 
     metrics = _parse_numbers(filename, df, metric_columns, dash_is_zero=field_map is SMARTSTORE_SALES_MAP)
+    observed = {c: [v not in ("", "-") for v in df[c]] for c in metric_columns}
 
     product_ids, product_names = df[id_column].tolist(), df[name_column].tolist()
     if field_map is SMARTSTORE_SALES_MAP:
@@ -291,8 +294,9 @@ def _parse(filename: str, content: bytes) -> _Parsed:
             product_ids = [product_ids[i] for i in keep]
             product_names = [product_names[i] for i in keep]
             metrics = {c: [values[i] for i in keep] for c, values in metrics.items()}
+            observed = {c: [values[i] for i in keep] for c, values in observed.items()}
 
-    return _Parsed(platform, periods, None, field_map, product_ids, product_names, metrics)
+    return _Parsed(platform, periods, None, field_map, product_ids, product_names, metrics, observed)
 
 
 def _parse_numbers(filename: str, df: pd.DataFrame, metric_columns: list[str], *, dash_is_zero: bool) -> dict[str, list[int | float]]:
@@ -330,13 +334,14 @@ def _parse_export(filename: str, df: pd.DataFrame, export: ExportFormat) -> _Par
     else:
         periods = [file_period] * len(df)
     metrics = _parse_numbers(filename, df, metric_columns, dash_is_zero=True)
+    observed = {c: [v not in ("", "-") for v in df[c]] for c in metric_columns}
     extras: dict[str, list[int | float]] = {}
     if export.extra_map and set(export.extra_map.values()) <= columns:
         raw = _parse_numbers(filename, df, list(export.extra_map.values()), dash_is_zero=True)
         # 쿠팡은 취소 금액·수량을 음수로 내려준다. 크기만 쓴다.
         extras = {f: [abs(v) for v in raw[c]] for f, c in export.extra_map.items()}
     return _Parsed(export.platform, periods, export, export.field_map,
-                   df[export.id_column].tolist(), df[export.name_column].tolist(), metrics, extras)
+                   df[export.id_column].tolist(), df[export.name_column].tolist(), metrics, observed, extras)
 
 
 def preview_file(filename: str, content: bytes) -> dict:
@@ -384,6 +389,7 @@ def normalize_with_coupang_sales(
     periods = periods or {}
     frames = []
     sales_frames = []
+    dashboard_sources = []
     for filename, content in files:
         parsed = _parse(filename, content)
         if not all(parsed.periods):
@@ -396,6 +402,7 @@ def normalize_with_coupang_sales(
                     {"file": filename, "needs_input": True},
                 )
             parsed.periods = [p or given for p in parsed.periods]
+        dashboard_sources.extend(capture_dashboard_source(parsed))
         values = {field: [int(round(v)) for v in parsed.metrics[column]] for field, column in parsed.field_map.items()}
         frame = pd.DataFrame(
             {
@@ -426,6 +433,7 @@ def normalize_with_coupang_sales(
     else:
         df = df[NORMALIZED_COLUMNS]
     df = df.sort_values(["period", "platform", "product_id"], kind="stable").reset_index(drop=True)
+    df.attrs["dashboard_sources"] = dashboard_sources
     sales = None
     if sales_frames:
         sales = pd.concat(sales_frames, ignore_index=True)

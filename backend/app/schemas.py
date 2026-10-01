@@ -240,6 +240,48 @@ class Insight(BaseModel):
     limitations: list[str] = []
 
 
+class DashboardMonth(BaseModel):
+    period: str
+    has_data: bool
+    has_sales: bool
+    has_ads: bool
+    values: dict[str, float | None]
+    store_values: dict[str, float | None]
+
+
+class DashboardProduct(BaseModel):
+    product_id: str
+    product_name: str
+    values: dict[str, float | None]
+    change: dict[str, float | None]
+
+
+class DashboardProducts(BaseModel):
+    source: str
+    sort_key: str
+    total: int
+    items: list[DashboardProduct]
+
+
+class DashboardPlatform(BaseModel):
+    platform: Literal["coupang", "naver"]
+    periods: list[str]
+    current: DashboardMonth
+    previous: DashboardMonth
+    change: dict[str, float | None]
+    store_change: dict[str, float | None]
+    has_store: bool
+    overlap_excluded: bool
+    trend: list[DashboardMonth]
+    products: list[DashboardProducts]
+
+
+class Dashboard(BaseModel):
+    period: str
+    previous_period: str
+    platforms: list[DashboardPlatform]
+
+
 class AnalyzeResponse(BaseModel):
     kpis: KPIs
     comparison: Comparison
@@ -248,6 +290,7 @@ class AnalyzeResponse(BaseModel):
     insight: Insight
     store: StoreKPIs | None = None  # 스마트스토어 판매 분석 파일이 없으면 None
     coupang: CoupangKPIs | None = None  # 쿠팡 판매 분석(옵션별 지표) 파일이 없으면 None
+    dashboard: Dashboard | None = None  # 표시 전용 출처·월별 집계. 기존 응답 필드는 유지한다.
 
 
 # ---- 오류 ----
