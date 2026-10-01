@@ -61,8 +61,8 @@ export function UploadPanel({
         }}
       >
         <span className="dz-icon" aria-hidden>↑</span>
-        <strong className="dz-title">리포트 파일을 여기로 끌어다 놓으세요</strong>
-        <span className="muted">또는 클릭해서 파일 선택 · Excel(.xlsx), CSV · 최대 10개 · 파일당 5MB</span>
+        <strong className="dz-title">파일 끌어다 놓기</strong>
+        <span className="muted">Excel(.xlsx), CSV · 최대 10개 · 파일당 5MB</span>
         <span className="btn primary dz-btn">파일 선택하기</span>
         <span className="dz-platforms">
           <span className="muted small">지원</span>
