@@ -14,6 +14,8 @@ interface Props {
   onPeriodChange: (filename: string, period: string) => void;
   onFilesChange: (files: File[]) => void;
   onAnalyze: () => void;
+  /** 결과 전 랜딩 화면에서는 큰 업로드 카드로 보여준다. */
+  hero?: boolean;
 }
 
 export function UploadPanel({
@@ -26,6 +28,7 @@ export function UploadPanel({
   onPeriodChange,
   onFilesChange,
   onAnalyze,
+  hero = false,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -42,7 +45,7 @@ export function UploadPanel({
   const opened = openPreview ? previewFor(openPreview) : undefined;
 
   return (
-    <section className="card upload">
+    <section className={`card upload${hero ? " is-hero" : ""}`}>
       <div
         className={`dropzone${dragOver ? " is-over" : ""}`}
         onClick={() => inputRef.current?.click()}
@@ -57,8 +60,23 @@ export function UploadPanel({
           addFiles(e.dataTransfer.files);
         }}
       >
-        <strong>Excel / CSV 파일을 끌어다 놓거나 클릭해서 선택</strong>
-        <span className="muted">쿠팡·네이버 판매·광고 리포트 · 최대 10개 · 파일당 5MB</span>
+        <span className="dz-icon" aria-hidden>↑</span>
+        <strong className="dz-title">리포트 파일을 여기로 끌어다 놓으세요</strong>
+        <span className="muted">또는 클릭해서 파일 선택 · Excel(.xlsx), CSV · 최대 10개 · 파일당 5MB</span>
+        <span className="btn primary dz-btn">파일 선택하기</span>
+        <span className="dz-platforms">
+          <span className="muted small">지원</span>
+          {[
+            ["쿠팡", "coupang"],
+            ["네이버", "naver"],
+            ["판매 리포트", ""],
+            ["광고 리포트", ""],
+          ].map(([label, tone]) => (
+            <span key={label} className={`dz-chip ${tone}`}>
+              {label}
+            </span>
+          ))}
+        </span>
         <input
           ref={inputRef}
           type="file"

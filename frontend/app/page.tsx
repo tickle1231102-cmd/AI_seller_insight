@@ -15,6 +15,8 @@ import { ChatPanel, type ChatMessage } from "@/features/insight/ChatPanel";
 import { ModeSelect } from "@/features/mode/ModeSelect";
 import { ModeToggle } from "@/features/mode/ModeToggle";
 import type { AnalysisMode } from "@/features/mode/mode";
+import { Hero, LandingDetails } from "@/features/landing/Landing";
+import { ThemeToggle } from "@/features/theme/ThemeToggle";
 
 type Status = "idle" | "uploading" | "analyzing" | "done" | "error";
 
@@ -137,15 +139,27 @@ export default function Home() {
 
   return (
     <main className="page">
-      <header className="header">
-        <div>
-          <h1>Seller Insight AI</h1>
-          <p className="muted">멀티플랫폼 판매·광고 성과 대시보드</p>
+      <div className="glow" aria-hidden />
+      <header className="topnav">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden>✦</span>
+          <span className="brand-name">Seller Insight AI</span>
         </div>
-        {USE_MOCK && <span className="badge">Mock 데이터 모드</span>}
+        <div className="topnav-right">
+          {!result && (
+            <a className="nav-link" href="#how">
+              사용 방법
+            </a>
+          )}
+          {USE_MOCK && <span className="badge">Mock 데이터 모드</span>}
+          <ThemeToggle />
+        </div>
       </header>
 
+      {!result && <Hero />}
+
       <UploadPanel
+        hero={!result}
         files={files}
         previews={previews}
         busy={busy}
@@ -218,20 +232,24 @@ export default function Home() {
         </div>
       )}
 
-      <ChatPanel
-        messages={messages}
-        pending={chatPending}
-        disabled={!result || !mode || status === "analyzing"}
-        disabledReason={
-          status === "analyzing"
-            ? "분석 중이에요. 분석이 끝나면 질문할 수 있어요."
-            : result && !mode
-              ? "분석 유형을 고르면 질문할 수 있어요."
-              : undefined
-        }
-        onSend={sendQuestion}
-        onReset={() => setMessages([])}
-      />
+      {!result && status !== "analyzing" && <LandingDetails />}
+
+      {result && (
+        <ChatPanel
+          messages={messages}
+          pending={chatPending}
+          disabled={!mode || status === "analyzing"}
+          disabledReason={
+            status === "analyzing"
+              ? "분석 중이에요. 분석이 끝나면 질문할 수 있어요."
+              : !mode
+                ? "분석 유형을 고르면 질문할 수 있어요."
+                : undefined
+          }
+          onSend={sendQuestion}
+          onReset={() => setMessages([])}
+        />
+      )}
     </main>
   );
 }
