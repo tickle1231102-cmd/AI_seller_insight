@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import type { PreviewFile } from "@/types/api";
 import { formatBytes, platformLabel } from "@/lib/format";
 
@@ -33,6 +33,8 @@ export function UploadPanel({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [openPreview, setOpenPreview] = useState<string | null>(null);
+  const [filesCollapsed, setFilesCollapsed] = useState(false);
+  const listId = useId();
 
   const addFiles = (list: FileList | null) => {
     if (!list) return;
@@ -92,6 +94,12 @@ export function UploadPanel({
 
       {files.length > 0 && (
         <>
+          <div className="file-list-heading">
+            <strong>첨부파일 {files.length}개</strong>
+            <button type="button" className="btn secondary" aria-expanded={!filesCollapsed} aria-controls={listId}
+              onClick={() => setFilesCollapsed(value => !value)}>{filesCollapsed ? "첨부파일 펼치기" : "첨부파일 접기"}</button>
+          </div>
+          <div id={listId} hidden={filesCollapsed}>
           <ul className="file-list">
             {files.map((f) => {
               const p = previewFor(f.name);
@@ -156,10 +164,12 @@ export function UploadPanel({
               </table>
             </div>
           )}
+          </div>
 
           {missingPeriods > 0 && (
             <p className="notice warn small">
               기간 정보가 없는 파일 {missingPeriods}개가 있어요. 각 파일의 월을 선택해야 분석을 시작할 수 있습니다.
+              {filesCollapsed && <button type="button" className="link" onClick={() => setFilesCollapsed(false)}>목록 펼쳐 월 입력하기</button>}
             </p>
           )}
           <button className="btn primary" onClick={onAnalyze} disabled={busy || missingPeriods > 0}>
