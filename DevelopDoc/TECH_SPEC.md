@@ -110,7 +110,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| `period` | string (`YYYY-MM`) | 기간 (원본 컬럼이 아니라 **파일명**의 `YYYY-MM` 에서 추출. 앞뒤에 숫자가 붙지 않은 것, 예: `coupang_2026-09.csv`) |
+| `period` | string (`YYYY-MM`) | 기간. 팀 템플릿은 **파일명**의 `YYYY-MM` (앞뒤에 숫자가 붙지 않은 것, 예: `coupang_2026-09.csv`), 스마트스토어·네이버 광고는 파일 안 날짜 컬럼(`날짜`·`일별`), 둘 다 없는 파일은 사용자 입력 `periods` (4-4) |
 | `platform` | string (`coupang` \| `naver` \| `naver_store`) | 플랫폼 (`naver_store` 는 4-3 참고) |
 | `product_id` | string | 상품 ID |
 | `product_name` | string | 상품명 |
@@ -144,6 +144,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 - 빈 숫자 셀 → 0 으로 처리
 - 금액·수량 5개 필드(`revenue`, `orders`, `units`, `ad_spend`, `ad_revenue`)는 정수로 반올림 (Python `round` 라 `.5` 는 짝수 쪽으로)
 - 파일명에서 기간을 찾지 못함 → `INVALID_PERIOD` 오류. 기간은 `YYYY-MM` 이 우선이고, 없으면 날짜 범위(`YYYYMMDD-YYYYMMDD` 등, 첫·끝 날짜의 중간이 속한 월)를 쓴다. 예: `sales_20260830-20260928.xlsx` → `2026-09`
+- 기간 정보가 없는 내보내기 파일(쿠팡 판매·광고)은 사용자 입력 `periods` 를 쓰고, 없으면 `INVALID_PERIOD` (`details.needs_input: true`). 기간을 추정하지 않는다 (4-4)
 - 셀 값 `-` 는 스마트스토어 판매 분석 파일에서만 0 으로 본다. 그 외 파일에서는 `INVALID_NUMBER`
 
 ### 4-3. 스마트스토어 판매 분석 (`naver_store`)
@@ -153,27 +154,30 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 - 판별: 컬럼에 `채널상품번호`, `채널상품명`, `판매금액(총)` 이 모두 있으면 스토어 판매 파일이다.
 - 매핑: `revenue`=판매금액(순), `orders`=상품결제건수, `units`=결제상품수량. `ad_spend`·`ad_revenue` 는 0. 추가 지표 `gross_revenue`(판매금액(총)), `visits`(방문수), `refund_count`, `refund_amount`, `discount_amount`(전체 할인액) 는 스토어 행에만 값이 있다 (그 외 행은 응답에서 필드 자체가 빠진다).
 - 기간: 행의 `날짜` 범위 중간이 속한 월, 없으면 파일명. 일자별 행은 월·상품별로 합친다.
-- **`kpis`·`comparison`·`signals` 는 `naver_store` 행을 제외하고 계산**한다. 스토어 파일만 올리면 제외할 행이 없으므로 그 행으로 계산한다.
-- 질문 실행(`run_plan`)은 지표별로 정한다: 기본 지표와 그 증감은 광고 리포트가 있으면 `naver_store` 행을 빼고, 스마트스토어 지표(`visits`·`gross_revenue`·`aov`·`conversion_rate`·`refund_rate`·`discount_rate` 와 그 증감)는 `naver_store` 행만 쓴다 (없으면 `STORE_DATA_NOT_FOUND` → `unsupported_question`). 상세는 `shared/contracts/README.md` 3장.
+- **`kpis`·`comparison`·`signals` 에 넣을지는 `normalize.core_rows` 가 월별로 정한다.** 같은 월에 판매 수치가 있는 `naver` 템플릿이 있으면 그 월의 `naver_store` 행을 빼고(판매액 중복), 아니면 `naver` 로 합친다 (예: 스마트스토어 판매 + 네이버 쇼핑검색광고). 스토어 파일만 올리면 그 행으로 계산한다.
+- 질문 실행(`run_plan`)은 지표별로 정한다: 기본 지표와 그 증감은 위 `core_rows` 규칙을 쓰고, 스마트스토어 지표(`visits`·`gross_revenue`·`aov`·`conversion_rate`·`refund_rate`·`discount_rate` 와 그 증감)는 `naver_store` 행만 쓴다 (없으면 `STORE_DATA_NOT_FOUND` → `unsupported_question`). 상세는 `shared/contracts/README.md` 3장.
 - `store` (응답 최상위, 스토어 파일이 없으면 `null`): 스토어 데이터의 최신 월·달력상 앞달 기준(앞달 자료가 없으면 `previous`/`change` 는 `null`) `current`/`previous`/`change`(퍼널·환불률·할인율·객단가), 상품별 `products`(최대 10개), `trend`.
 - 방문·검색어·고객 분석 파일은 아직 지원하지 않으며 `UNSUPPORTED_DATASET` 오류를 낸다 (P1).
 
-### 4-4. 지원 입력 범위 (#21 결정)
+### 4-4. 지원 입력 범위 (#21 → #38·#40 확장)
 
-지원하는 입력은 **팀 정의 통합 템플릿 `coupang`·`naver`**(4-1)와 **스마트스토어 판매 분석 `naver_store`**(4-3)뿐이다. 플랫폼은 파일명이 아니라 컬럼 구조로 판별한다. `채널상품번호`·`채널상품명`·`판매금액(총)` 세 컬럼이 모두 있으면 `naver_store`, 아니면 `coupang`·`naver` 중 지표 컬럼 5개가 더 많이 일치하는 쪽이다 (3개 이상 일치, 동률·미달이면 `UNKNOWN_PLATFORM`). 3개 이상 겹치지만 필요한 컬럼이 빠진 파일은 `MISSING_COLUMNS` 다.
+#21 에서 팀 정의 템플릿 + 스마트스토어 판매 분석으로 정했고, #38 에서 플랫폼 실제 내보내기 3종을, #40 에서 기간 정보가 없는 파일의 월 입력을 추가했다. 판별 순서는 **내보내기 형식(`normalize.EXPORT_FORMATS`) → 스마트스토어 판매 분석 → 팀 템플릿**이다. 내보내기 형식은 "알아보는 컬럼"이 모두 있으면 그 형식으로 읽는다.
 
-| 실제 형식 리포트 (합성 샘플로 확인) | 결과 | 이유 |
-|---|---|---|
-| 네이버 스마트스토어 판매 분석 | 지원 (`naver_store`) | 4-3 |
-| 쿠팡 판매 리포트 | `UNKNOWN_PLATFORM` | 지표 5개 중 `주문`·`판매량`만 일치, 광고 컬럼 없음 |
-| 네이버 쇼핑검색광고 리포트 | `UNKNOWN_PLATFORM` | `총비용`·`총 전환매출액` 등 컬럼명이 다르고 판매 컬럼 없음 |
-| 쿠팡 광고 리포트 | `UNKNOWN_PLATFORM` | `광고비`만 일치 |
+| 파일 | platform | 알아보는 컬럼 | 매핑 | 기간 |
+|---|---|---|---|---|
+| 쿠팡 판매 지표 (Wing 옵션별) | `coupang` | `옵션 ID`·`등록상품ID`·`매출(원)` | `revenue`=매출(원), `orders`=주문, `units`=판매량 · 상품 키 `옵션 ID`·`옵션명` | 파일명 `YYYY-MM` → 사용자 입력 `periods` |
+| 쿠팡 광고 리포트 | `coupang` | `캠페인 ID`·`광고집행 옵션ID`·`광고비` | `ad_spend`=광고비, `ad_revenue`=총 전환매출액(14일) · 상품 키 `광고집행 옵션ID`·`광고집행 상품명` | 위와 같음 |
+| 네이버 쇼핑검색광고 소재 보고서 | `naver` | `일별`·`소재`·`총비용` | `ad_spend`=총비용, `ad_revenue`=총 전환매출액 · 상품 키 `소재` | `일별` 컬럼 → 파일명 |
+| 네이버 스마트스토어 판매 분석 | `naver_store` | `채널상품번호`·`채널상품명`·`판매금액(총)` | 4-3 | 4-3 |
+| 팀 템플릿 쿠팡·네이버 | `coupang`·`naver` | 지표 컬럼 5개 중 3개 이상 일치 (동률·미달이면 `UNKNOWN_PLATFORM`) | 4-1 | 파일명 |
 
-- 샘플은 공식 도움말·화면 지표를 바탕으로 만든 합성 데이터라 실제 내보내기와 완전히 같다는 보장은 없다. 상세: `DevelopDoc/TEST_RESULTS.md` 4장, #21.
-- 알려진 한계: 스마트스토어 판매 파일에서 한 월 안에 월 요약 행과 일자별 `전체` 행만 있고 상품 행이 없으면, 두 요약 행이 겹쳐 집계될 수 있다 (`TEST_RESULTS.md` 4장).
-- 향후 과제 (이번 범위 제외)
-  - 부분 리포트 합산: 쿠팡 판매·광고 파일을 각각 판별해 플랫폼·월 단위로 합산. 먼저 전환매출 기준(1일/14일), 매출 기준(`매출(원)`/`총 매출(원)`), 판매·광고 기간 불일치 경고, 4-3 KPI 범위와의 관계를 정해야 한다.
-  - 상품 단위 병합: 네이버 쇼핑검색광고 리포트에는 상품 키가 없어 보류.
+- 내보내기 파일에 없는 지표는 0 이고, 같은 월·상품 행은 합친다. KPI 는 플랫폼·월 합계로 계산한다.
+- 기간 정보가 없는 파일은 **추정하지 않는다.** `POST /api/analyze` 의 `periods` 입력(7-4)이 없으면 `INVALID_PERIOD` (`details.needs_input: true`). 파일 안에 기간이 있으면 입력은 무시한다.
+- 쿠팡 광고매출은 **14일 기준**(`총 전환매출액(14일)`)이다. 구현에서 고른 기준이고 팀 합의 사항은 아니다. 1일 기준이면 ROAS 가 달라진다 (`TEST_RESULTS.md` 4장).
+- 3개 이상 겹치지만 필요한 컬럼이 빠진 템플릿은 `MISSING_COLUMNS`, 방문·검색어·고객 분석 파일은 `UNSUPPORTED_DATASET` 이다.
+- 검산: 실제 형식 샘플 4종(`shared/fixtures/exports/`)을 원본 합계와 대조해 일치 (`TEST_RESULTS.md` 4장). 샘플은 공식 도움말·화면 지표를 바탕으로 만든 합성 데이터라 실제 내보내기와 완전히 같다는 보장은 없다.
+- 한계: 판매·광고 파일의 상품 ID 가 달라 **상품 단위로는 합쳐지지 않는다** (상품별 ROAS 부정확). 스마트스토어 판매 파일에서 한 월 안에 월 요약 행과 일자별 `전체` 행만 있고 상품 행이 없으면 두 요약 행이 겹쳐 집계될 수 있다.
+- 향후 과제: 상품 단위 병합, 추가 내보내기 형식 (#32).
 
 ## 5. KPI 계산 명세
 
@@ -241,7 +245,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 | `INVALID_NUMBER` | 422 | 숫자 변환 실패 |
 | `UNKNOWN_PLATFORM` | 422 | 플랫폼 판별 불가 |
 | `UNSUPPORTED_DATASET` | 422 | 스마트스토어 방문·검색어·고객 분석 파일 (판매 분석만 지원) |
-| `INVALID_PERIOD` | 422 | 파일명에서 기간(`YYYY-MM` 또는 날짜 범위)을 찾지 못함 |
+| `INVALID_PERIOD` | 422 / 400 | 422: 기간(`YYYY-MM`·날짜 범위·날짜 컬럼)을 찾지 못함, 또는 기간 정보가 없는 파일에 `periods` 입력이 없거나 형식이 틀림(`details.needs_input`). 400: `periods` 필드가 JSON 객체가 아님 |
 | `QUESTION_TOO_LONG` | 400 | 질문 길이 초과 |
 | `NOT_FOUND` | 404 | 없는 주소 |
 | `METHOD_NOT_ALLOWED` | 405 | 잘못된 요청 방식 |
@@ -283,7 +287,7 @@ LLM 실패 시 7·8단계만 실패 처리하고 1~6단계 결과는 정상 반�
 ### 7-4. `POST /api/analyze`
 
 - Content-Type: `multipart/form-data`
-- Body: `files` (복수), `question` (선택, string)
+- Body: `files` (복수), `question` (선택, string), `periods` (선택, JSON `{"파일명": "YYYY-MM"}` — 기간 정보가 없는 파일에만 쓰이고, 파일에 기간이 있으면 무시. 4-4)
 
 ```json
 {
