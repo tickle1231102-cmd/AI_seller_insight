@@ -161,19 +161,19 @@
 ### WU-AI-01 LLM 클라이언트 · 실패 처리
 - **담당:** D · **리뷰:** A
 
-> #18/#22 A 승인·병합 후 main f05ff2c 비유료493개를 확인하고 D 서버 기능만 체크했다. 새 배포 UI/E2E는 별도 대기다. 실제 API는 동일 AI 구현29a90ea의 기록이다. #34 대화형 fallback은 보완 요청으로 미병합이며 최신 단일 기준은 `D_WEDNESDAY_STATUS.md`다.
+> 10/1 main657d7ce + D 문서 갱신본(실행 코드 동일) 비유료533개/유료 opt-in10개 제외를 확인했다. 실제 유료 API 평가는29a90ea 과거 기록이다. #34는 자유 생성 제거·서버 고정 인사 방식으로 보완·병합됐다. 배포 ffe31fb 검증과 #42 로컬 모드 QA를 구분하고 최신 전체 배포/팀 판정은 대기한다. #42 월/파일 변경 컨텍스트는 A 수정 요청이며 최신 기준은 `D_WEDNESDAY_STATUS.md`다.
 
 **완료 조건**
 - [x] `ai/` 내 LLM 호출 함수가 API 키를 환경변수로만 읽음 (`OPENAI_API_KEY` 우선, `LLM_API_KEY` 호환; 실제 키는 커밋하지 않음)
 - [x] 호출 1회당 타임아웃 적용 (`LLM_TIMEOUT_SECONDS`, 기본 30초 — 최신 TECH_SPEC과 일치)
 - [x] JSON 파싱/검증 실패 시 1회 재시도 후 `llm_error` 반환 (`test_structured_client_retries_invalid_output_once`)
 - [x] API 키 없음·네트워크 오류 시 예외가 밖으로 새지 않고 `llm_error` 반환 (`test_missing_api_key_is_normalized`, `test_structured_client_normalizes_provider_failure`)
-- [x] 실패 경로를 모킹한 테스트 통과 (main f05ff2c 비유료493 passed/10 deselected)
+- [x] 실패 경로를 모킹한 테스트 통과 (main657d7ce 실행 코드와 동일한 D 문서 갱신본 비유료533 passed/10 deselected)
 
 ### WU-AI-02 질문 → 분석 계획 JSON (Planner)
 - **담당:** D · **리뷰:** A
 
-> #18 A 승인/main 반영 및 실제 main 회귀 확인 완료. 유료40문항은 동일 AI 구현 29a90ea의 기록이며 새 배포 UI는 별도다.
+> #18 A 승인/main 반영 및10/1 비유료 회귀 확인 완료. 유료40문항은29a90ea의 과거 기록이며 최신 실행과 합산하지 않는다. #34의 고정 인사 경로는 추가 LLM 없이 응답하고 일반 데이터 질문은 기존 Planner를 사용한다.
 
 **완료 조건**
 - [x] `planner.py` 가 질문 → `AnalysisPlan` (`metric`, `group_by`, `sort`, `limit`, `period`) 반환
@@ -284,7 +284,7 @@
 - **담당:** D · **리뷰:** A
 
 **완료 조건**
-> #18/#22 A 승인·병합 및 main 품질 회귀 확인 완료. 배포 UI/E2E는 별도이며 이번 완료 근거 문서 후속은 A 리뷰 대상이다.
+> #18/#22 A 승인·병합 및10/1 main 코드 비유료533개 품질 회귀 확인 완료. 배포 ffe31fb의 정상·미지원·AI 상태 모의 UI와 #42 로컬 QA는 검증 범위를 구분해 기록했다. #37 D 완료 근거 갱신은 A 리뷰 대상이며 최신 전체 배포/팀 최종 승인은 별도다.
 - [x] 인사이트 품질 테스트 최소 5개 이상 구성 (`test_insight_safety.py`, `test_insight_number_grounding.py`, `ai_quality_runner.py`의 실제 인사이트 9개 시나리오)
 - [x] 검증한 시나리오에서 사실 문장은 서버가 검증된 계산값으로 생성하고 호출자의 `plan`/`answer`를 보존 (숫자 변조 0건; 모든 임의 입력의 정확도 보장 아님)
 - [x] 광고 소재·CTR·CPC·CVR·경쟁사·시장 상황 등 입력에 없는 원인을 모델이 단정문으로 생성하는 경로 제거 (허용되지 않은 자유 문장/ID 차단)
