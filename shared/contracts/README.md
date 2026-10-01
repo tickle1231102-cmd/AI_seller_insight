@@ -82,7 +82,7 @@ B 의 `routers/preview.py`, `routers/analyze.py` 가 아래 함수를 호출한�
 | 단계 (TECH_SPEC 1장) | 호출 | 위치 | 상태 |
 |---|---|---|---|
 | preview | `normalize.preview_file(filename: str, content: bytes) -> dict` | `analysis/normalize.py` (C) | 구현됨 |
-| 2·3 정규화 | `normalize.normalize_files(files: list[tuple[str, bytes]]) -> DataFrame` | `analysis/normalize.py` (C) | 구현됨 |
+| 2·3 정규화 | `normalize.normalize_files(files: list[tuple[str, bytes]], periods: dict[str, str] \| None = None) -> DataFrame` | `analysis/normalize.py` (C) | 구현됨 |
 | 4 KPI | `kpi.compute_kpis(df) -> dict` (응답 `kpis`) | `analysis/kpi.py` (C) | 구현됨 |
 | 5 비교 | `compare.build_comparison(df) -> dict` (응답 `comparison`) | `analysis/compare.py` (C) | 구현됨 |
 | 6 신호 | `signals.detect_signals(kpis, comparison) -> list[dict]` | `analysis/signals.py` (C) | 구현됨 |
@@ -98,7 +98,8 @@ B 의 `routers/preview.py`, `routers/analyze.py` 가 아래 함수를 호출한�
 - AI 단계(7·8)에서 어떤 예외가 나도 B 가 잡아 `insight.status = "llm_error"` 로 바꾸고 `kpis`/`comparison`/`rows`/`signals` 는 정상 반환한다.
 - `PlannerResult.status == "unsupported_question"` 이면 인사이트를 호출하지 않고 `insight.summary` 에 `reason` 을 담는다.
 - B 는 `create_analysis_plan` 에 업로드된 월 목록(`periods`, 오래된 월부터 `YYYY-MM`)을 넘긴다. planner 는 이것으로 "8월"·"지난달"·"이번 달" 같은 표현을 실제 월로 바꾼다.
-- B 는 `run_plan` 에 **스마트스토어 행을 포함한 전체 정규화 df** 를 넘긴다 (`kpis`·`comparison`·`signals` 는 스마트스토어 행을 뺀 df). 지표별로 어떤 행을 쓸지는 `run_plan` 이 정한다 (1장).
+- B 는 `/api/analyze` 의 `periods` 폼 필드(JSON `{"파일명": "YYYY-MM"}`)를 읽어 `normalize_files` 에 넘긴다. JSON 객체가 아니면 400 `INVALID_PERIOD` (1장·2장).
+- B 는 `kpis`·`comparison`·`signals` 에 `normalize.core_rows(df)` 를 넘기고 (1장 규칙), `run_plan` 에는 **스마트스토어 행을 포함한 전체 정규화 df** 를 넘긴다. 지표별로 어떤 행을 쓸지는 `run_plan` 이 정한다 (5장).
 - `AnalysisPlan.metric` 허용값 (`ai/models.py` 의 `Metric` 이 기준):
 
   | 구분 | 값 |
