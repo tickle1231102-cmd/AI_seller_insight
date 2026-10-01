@@ -19,6 +19,7 @@ import { ModeSelect } from "@/features/mode/ModeSelect";
 import { ModeToggle } from "@/features/mode/ModeToggle";
 import type { AnalysisMode } from "@/features/mode/mode";
 import { Hero, LandingDetails } from "@/features/landing/Landing";
+import { MarketOrbit } from "@/features/landing/MarketOrbit";
 import { ThemeToggle } from "@/features/theme/ThemeToggle";
 
 type Status = "idle" | "uploading" | "analyzing" | "done" | "error";
@@ -157,8 +158,8 @@ export default function Home() {
         </div>
       </header>
 
-      {!result && <Hero />}
-
+      <div className={!result ? "landing-stage" : "upload-stage"}>
+      {!result && <><MarketOrbit /><Hero /></>}
       <UploadPanel
         hero={!result}
         files={files}
@@ -171,6 +172,7 @@ export default function Home() {
         onFilesChange={handleFilesChange}
         onAnalyze={runAnalyze}
       />
+      </div>
 
       {error && (
         <div className="notice error" role="alert">
