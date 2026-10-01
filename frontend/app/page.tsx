@@ -14,11 +14,13 @@ import { DashboardViewToggle, PlatformDashboard, type DashboardView } from "@/fe
 import { label as dashboardPlatformLabel } from "@/features/dashboard/dashboardMetrics";
 import { SignalBadges } from "@/features/dashboard/SignalBadges";
 import { FloatingInsight } from "@/features/insight/FloatingInsight";
+import { FloatingChat } from "@/features/insight/FloatingChat";
 import { ChatPanel, type ChatMessage } from "@/features/insight/ChatPanel";
 import { ModeSelect } from "@/features/mode/ModeSelect";
 import { ModeToggle } from "@/features/mode/ModeToggle";
 import type { AnalysisMode } from "@/features/mode/mode";
 import { Hero, LandingDetails } from "@/features/landing/Landing";
+import { MarketOrbit } from "@/features/landing/MarketOrbit";
 import { ThemeToggle } from "@/features/theme/ThemeToggle";
 
 type Status = "idle" | "uploading" | "analyzing" | "done" | "error";
@@ -98,8 +100,8 @@ export default function Home() {
       if (seq !== analyzeSeq.current) return;
       setResult(res);
       setCollapsedPlatforms({});
-      // 파일 구성이 바뀌면 이전 모드가 맞지 않을 수 있어 다시 고르게 한다. 같은 파일 재시도는 모드를 유지한다.
-      if (analyzed && snapshot.files !== analyzed.files) setMode(null);
+      // 새 대시보드는 바로 요약을 표시하고, 구버전 응답만 유형을 고르게 한다. 같은 파일 재시도는 모드를 유지한다.
+      if (!mode || (analyzed && snapshot.files !== analyzed.files)) setMode(res.dashboard ? "sales" : null);
       setAnalyzed(snapshot);
       // 분석 기준이 바뀌었으므로 이전 기준의 대화는 비운다.
       setMessages([]);
@@ -144,11 +146,10 @@ export default function Home() {
     result.comparison.by_platform.every((p) => p.platform === "naver_store");
 
   return (
-    <main className={`page${result && mode ? " has-summary-fab" : ""}`}>
+    <main className={`page${result ? " has-summary-fab" : ""}`}>
       <div className="glow" aria-hidden />
       <header className="topnav">
         <div className="brand">
-          <span className="brand-mark" aria-hidden>✦</span>
           <span className="brand-name">Seller Insight AI</span>
         </div>
         <div className="topnav-right">
@@ -157,8 +158,8 @@ export default function Home() {
         </div>
       </header>
 
-      {!result && <Hero />}
-
+      <div className={!result ? "landing-stage" : "upload-stage"}>
+      {!result && <><MarketOrbit /><Hero /></>}
       <UploadPanel
         hero={!result}
         files={files}
@@ -171,6 +172,7 @@ export default function Home() {
         onFilesChange={handleFilesChange}
         onAnalyze={runAnalyze}
       />
+      </div>
 
       {error && (
         <div className="notice error" role="alert">
@@ -203,8 +205,8 @@ export default function Home() {
               </span>
             ))}
             <span className="grow" />
-            <ModeToggle mode={mode} onChange={setMode} />
             {result.dashboard && <DashboardViewToggle value={dashboardView} onChange={setDashboardView} />}
+            {(!result.dashboard || dashboardView === "detailed") && <ModeToggle mode={mode} onChange={setMode} />}
             {periodLabel && <span className="chip">{periodLabel}</span>}
             <span className="muted small">분석한 파일 {analyzed?.files.length ?? files.length}개</span>
           </div>
@@ -237,9 +239,9 @@ export default function Home() {
 
       {!result && status !== "analyzing" && <LandingDetails />}
 
-      {result && mode && <FloatingInsight insight={result.insight} period={periodLabel ?? result.kpis.period} busy={status === "analyzing"} stale={inputsChanged} onRetry={runAnalyze} />}
-
       {result && (
+        <div className="ai-fab-stack">
+        <FloatingChat pending={chatPending} stale={inputsChanged}>
         <ChatPanel
           messages={messages}
           pending={chatPending}
@@ -254,6 +256,9 @@ export default function Home() {
           onSend={sendQuestion}
           onReset={() => setMessages([])}
         />
+        </FloatingChat>
+        {mode && <FloatingInsight insight={result.insight} period={periodLabel ?? result.kpis.period} busy={status === "analyzing"} stale={inputsChanged} onRetry={runAnalyze} />}
+        </div>
       )}
     </main>
   );

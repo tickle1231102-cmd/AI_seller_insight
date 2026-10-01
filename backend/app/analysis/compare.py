@@ -119,6 +119,10 @@ def run_plan(df, plan, coupang_sales=None) -> list[dict]:
     그룹별 ROAS 는 행 평균이 아니라 그룹 합계로 다시 계산한다. 데이터에 없는 월이면 AppError.
     coupang_sales 는 쿠팡 지표(COUPANG_METRICS) 질문에만 쓴다. 상품별은 옵션 단위다.
     """
+    if _get(plan, "analysis_type") == "product_diagnosis":
+        from app.analysis.product_diagnosis import run_product_diagnosis
+        return run_product_diagnosis(df, _get(plan, "diagnosis_intent"), _get(plan, "limit", DEFAULT_LIMIT),
+                                     period=_get(plan, "period"), required_conditions=_get(plan, "required_conditions", []))
     metric = _get(plan, "metric")
     if metric in CHANGE_METRICS:
         return _run_change_plan(df, plan, metric, coupang_sales)

@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
-import { Noto_Sans_KR } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const notoSansKr = Noto_Sans_KR({
-  weight: ["400", "500", "700", "900"],
+const pretendard = localFont({
+  src: "./fonts/PretendardVariable.woff2",
+  weight: "45 920",
   display: "swap",
-  preload: false,
-  variable: "--font-kr",
+  variable: "--font-pretendard",
 });
 
 export const metadata: Metadata = {
@@ -14,12 +14,12 @@ export const metadata: Metadata = {
   description: "멀티플랫폼 판매·광고 데이터 통합 분석 대시보드",
 };
 
-// 저장된 테마(없으면 시스템 설정)를 첫 페인트 전에 적용해 깜빡임을 막는다.
-const themeScript = `try{var t=localStorage.getItem("theme");if(t!=="light"&&t!=="dark")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t}catch(e){}`;
+// 처음 방문하면 시스템 테마와 무관하게 라이트. 사용자가 저장한 선택만 우선한다.
+const themeScript = `var t="light";try{var saved=localStorage.getItem("theme");if(saved==="light"||saved==="dark")t=saved}catch(e){}document.documentElement.dataset.theme=t;`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ko" className={notoSansKr.variable} suppressHydrationWarning>
+    <html lang="ko" data-theme="light" className={pretendard.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

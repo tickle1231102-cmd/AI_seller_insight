@@ -7,7 +7,8 @@ from typing import Any, Protocol, TypeVar
 from pydantic import BaseModel, ValidationError
 
 from .client import LLMClientError, OpenAIStructuredClient
-from .models import AnalysisPlan, Insight, InsightSelection
+from .models import AnalysisPlan, ProductDiagnosisPlan, Insight, InsightSelection
+from .diagnosis_insight import create_diagnosis_insight
 from .facts import EvidenceCatalogue
 from .prompts import INSIGHT_INSTRUCTIONS
 
@@ -24,11 +25,13 @@ class StructuredGenerator(Protocol):
 def create_insight(
     kpis: Mapping[str, Any], comparison: Mapping[str, Any],
     signals: Sequence[Mapping[str, Any]], *,
-    plan: AnalysisPlan | None = None,
+    plan: AnalysisPlan | ProductDiagnosisPlan | None = None,
     answer: Sequence[Mapping[str, Any]] | None = None,
     llm: StructuredGenerator | None = None,
 ) -> Insight:
     """Let AI prioritize verified facts; only the server renders public text."""
+    if getattr(plan, "analysis_type", None) == "product_diagnosis":
+        return create_diagnosis_insight(plan, answer)
     caller_fields = {"plan": plan, "answer": list(answer) if answer is not None else []}
     catalogue = EvidenceCatalogue.build(kpis, comparison, signals, plan, answer)
     if catalogue.conflicts:

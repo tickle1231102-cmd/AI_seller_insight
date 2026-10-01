@@ -18,6 +18,7 @@ from pathlib import Path
 import pandas as pd
 
 from app.core.errors import AppError
+from app.analysis.diagnosis_sources import attach_sources, capture_source
 from app.analysis.dashboard import capture_dashboard_source
 
 logger = logging.getLogger(__name__)
@@ -389,6 +390,7 @@ def normalize_with_coupang_sales(
     periods = periods or {}
     frames = []
     sales_frames = []
+    diagnosis_rows = []
     dashboard_sources = []
     for filename, content in files:
         parsed = _parse(filename, content)
@@ -402,6 +404,7 @@ def normalize_with_coupang_sales(
                     {"file": filename, "needs_input": True},
                 )
             parsed.periods = [p or given for p in parsed.periods]
+        diagnosis_rows.extend(capture_source(parsed))
         dashboard_sources.extend(capture_dashboard_source(parsed))
         values = {field: [int(round(v)) for v in parsed.metrics[column]] for field, column in parsed.field_map.items()}
         frame = pd.DataFrame(
@@ -441,7 +444,7 @@ def normalize_with_coupang_sales(
         names = sales.groupby(keys, sort=False)["product_name"].first()
         sales = sales.drop(columns="product_name").groupby(keys, sort=True).sum().join(names).reset_index()
         sales = sales[["period", "product_id", "product_name", *COUPANG_SALES_FIELDS]]
-    return df, sales
+    return attach_sources(df, diagnosis_rows), sales
 
 
 def core_rows(df: pd.DataFrame) -> pd.DataFrame:
