@@ -116,3 +116,36 @@ def test_analyze_rejects_malformed_period_input(raw):
     res = client.post("/api/analyze", files=[("files", f) for f in files(ALL)], data={"periods": raw})
     assert res.status_code == 400
     assert res.json()["error"]["code"] == "INVALID_PERIOD"
+
+
+# ---- 쿠팡 판매 분석 (옵션별 지표) ----
+def test_coupang_sales_section_matches_raw_columns():
+    raw = pd.read_excel(COUPANG_SALES)
+    res = client.post("/api/analyze", files=[("files", f) for f in files(ALL)], data={"periods": json.dumps(SEPT)})
+    assert res.status_code == 200
+    cp = res.json()["coupang"]
+    cur = cp["current"]
+    assert cp["period"] == "2026-09" and cp["previous"] is None
+    assert cur["visits"] == raw["방문자"].sum() and cur["cart_adds"] == raw["장바구니"].sum()
+    assert cur["gross_revenue"] == raw["총 매출(원)"].sum()
+    assert cur["cancel_amount"] == -raw["총 취소 금액(원)"].sum() > 0  # 쿠팡은 음수로 내려준다
+    by_platform = {r["platform"]: r for r in res.json()["comparison"]["by_platform"]}
+    assert cur["revenue"] == by_platform["coupang"]["revenue"]  # 플랫폼 비교의 쿠팡 매출과 같다
+    assert cur["conversion_rate"] == round(cur["orders"] / cur["visits"] * 100, 1)
+    assert cur["cancel_rate"] == round(cur["cancel_units"] / cur["gross_units"] * 100, 1)
+    revenues = [p["revenue"] for p in cp["products"]]
+    assert len(revenues) == 10 and revenues == sorted(revenues, reverse=True)
+
+
+def test_coupang_sales_month_over_month():
+    pair = [("cs_2026-08.xlsx", COUPANG_SALES.read_bytes()), ("cs_2026-09.xlsx", COUPANG_SALES.read_bytes())]
+    res = client.post("/api/analyze", files=[("files", f) for f in pair])
+    cp = res.json()["coupang"]
+    assert cp["previous_period"] == "2026-08" and len(cp["trend"]) == 2
+    assert cp["change"]["revenue_change"] == 0 and cp["change"]["conversion_rate_change_pp"] == 0
+
+
+def test_no_coupang_section_without_sales_file():
+    res = client.post("/api/analyze", files=[("files", f) for f in files([COUPANG_ADS])],
+                      data={"periods": json.dumps({COUPANG_ADS.name: "2026-09"})})
+    assert res.status_code == 200 and res.json()["coupang"] is None

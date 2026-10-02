@@ -125,7 +125,7 @@ def test_real_api_composite_flow_preserves_kpis_and_existing_contract(monkeypatc
         response = client.post("/api/analyze", files=[("files", f) for f in uploads()], data={"question": question})
     assert response.status_code == 200, response.text
     body = response.json()
-    assert set(body) == {"kpis", "comparison", "rows", "signals", "insight", "store", "dashboard"}
+    assert set(body) == {"kpis", "comparison", "rows", "signals", "insight", "store", "dashboard", "coupang"}
     assert body["dashboard"] is not None
     assert sum(p["current"]["values"]["revenue"] for p in body["dashboard"]["platforms"]) == 3300
     assert body["kpis"]["current"]["revenue"] == 3300

@@ -5,7 +5,9 @@
 
 from typing import Any
 
-from app.analysis.kpi import STORE_SUM_FIELDS, _pct_change, _ratio, previous_calendar_month, raw_roas, store_totals, totals
+from app.analysis.kpi import (
+    STORE_SUM_FIELDS, _pct_change, _ratio, coupang_totals, previous_calendar_month, raw_roas, store_totals, totals,
+)
 from app.analysis.normalize import STORE_PLATFORM, core_rows
 from app.core.errors import AppError
 
@@ -25,31 +27,55 @@ CHANGE_METRICS = {
     "conversion_rate_change_pp": "conversion_rate",
     "refund_rate_change_pp": "refund_rate",
     "discount_rate_change_pp": "discount_rate",
+    "coupang_visits_change": "coupang_visits",
+    "coupang_aov_change": "coupang_aov",
+    "coupang_conversion_rate_change_pp": "coupang_conversion_rate",
+    "coupang_cart_rate_change_pp": "coupang_cart_rate",
+    "coupang_cancel_rate_change_pp": "coupang_cancel_rate",
 }
 # 스마트스토어 판매 분석 파일에만 있는 지표. 스마트스토어 행만 골라 store_totals 로 계산한다.
 STORE_METRICS = {"visits", "gross_revenue", "aov", "conversion_rate", "refund_rate", "discount_rate"}
+# 쿠팡 판매 분석(옵션별 지표) 파일에만 있는 지표. 스마트스토어 지표와 정의가 달라 이름을 따로 둔다.
+# 쿠팡 판매 분석 데이터(normalize_with_coupang_sales 의 두 번째 값)로 coupang_totals 를 계산한다.
+COUPANG_METRICS = {"coupang_visits", "coupang_aov", "coupang_conversion_rate", "coupang_cart_rate", "coupang_cancel_rate"}
 # 비율 지표의 반올림 전 원값. 증감은 이 값끼리 뺀 %p 다.
 _RAW_RATES = {
     "roas": lambda t: raw_roas(t["ad_revenue"], t["ad_spend"]),
     "conversion_rate": lambda t: _ratio(t["orders"], t["visits"]),
     "refund_rate": lambda t: _ratio(t["refund_count"], t["orders"]),
     "discount_rate": lambda t: _ratio(t["discount_amount"], t["gross_revenue"]),
+    "coupang_conversion_rate": lambda t: _ratio(t["coupang_orders"], t["coupang_visits"]),
+    "coupang_cart_rate": lambda t: _ratio(t["coupang_cart_adds"], t["coupang_visits"]),
+    "coupang_cancel_rate": lambda t: _ratio(t["coupang_cancel_units"], t["coupang_gross_units"]),
 }
 
 
-def _scope(df, base: str):
+def _scope(df, base: str, coupang_sales=None):
     """지표에 맞는 행만 남긴다.
 
+    쿠팡 지표면 쿠팡 판매 분석 데이터 (없으면 AppError, platform 은 "coupang").
     스마트스토어 지표면 스마트스토어 행만 (없으면 AppError). 그 외 지표는 routers/analyze.py 의 kpis 와 같은 규칙
     (normalize.core_rows) 으로 판매액이 겹치는 스마트스토어 행을 빼거나 naver 로 합친다.
     """
+    if base in COUPANG_METRICS:
+        if coupang_sales is None or coupang_sales.empty:
+            raise AppError(
+                "COUPANG_SALES_DATA_NOT_FOUND",
+                "쿠팡 방문자·전환율·장바구니율·취소율·결제단가는 쿠팡 판매 분석(옵션별 지표) 파일이 있어야 답할 수 있어요.",
+                422,
+                {"metric": base},
+            )
+        return coupang_sales.assign(platform="coupang")
     if base not in STORE_METRICS:
         return core_rows(df)
     store = df[df["platform"] == STORE_PLATFORM]
     if store.empty:
+        hint = ""
+        if coupang_sales is not None and not coupang_sales.empty and f"coupang_{base}" in COUPANG_METRICS:
+            hint = " 쿠팡 판매 분석 지표는 '쿠팡 전환율'처럼 앞에 쿠팡을 붙여 물어봐 주세요."
         raise AppError(
             "STORE_DATA_NOT_FOUND",
-            "방문수·전환율·환불률·할인율·결제단가는 스마트스토어 판매 분석(SALES) 파일이 있어야 답할 수 있어요.",
+            "방문수·전환율·환불률·할인율·결제단가는 스마트스토어 판매 분석(SALES) 파일이 있어야 답할 수 있어요." + hint,
             422,
             {"metric": base},
         )
@@ -57,6 +83,8 @@ def _scope(df, base: str):
 
 
 def _totals(group, base: str) -> dict:
+    if base in COUPANG_METRICS:  # 쿠팡 지표는 키에 coupang_ 을 붙여 스마트스토어 지표와 구분한다
+        return {f"coupang_{k}": v for k, v in coupang_totals(group).items()}
     return store_totals(group) if base in STORE_METRICS else totals(group)
 
 
@@ -83,12 +111,13 @@ def _get(plan: Any, key: str, default: Any = None) -> Any:
     return default if value is None else value
 
 
-def run_plan(df, plan) -> list[dict]:
+def run_plan(df, plan, coupang_sales=None) -> list[dict]:
     """D 의 AnalysisPlan (metric, group_by, sort, limit, period) 을 실행 → insight.answer 행 목록.
 
     sort=None → desc, limit=None → 5, period=None → 최신 월, group_by=None → 전체 1행.
     단, group_by="period" 이면서 period=None 이면 월별 비교가 목적이므로 전체 기간을 쓴다.
     그룹별 ROAS 는 행 평균이 아니라 그룹 합계로 다시 계산한다. 데이터에 없는 월이면 AppError.
+    coupang_sales 는 쿠팡 지표(COUPANG_METRICS) 질문에만 쓴다. 상품별은 옵션 단위다.
     """
     if _get(plan, "analysis_type") == "product_diagnosis":
         from app.analysis.product_diagnosis import run_product_diagnosis
@@ -96,8 +125,8 @@ def run_plan(df, plan) -> list[dict]:
                                      period=_get(plan, "period"), required_conditions=_get(plan, "required_conditions", []))
     metric = _get(plan, "metric")
     if metric in CHANGE_METRICS:
-        return _run_change_plan(df, plan, metric)
-    df = _scope(df, metric)
+        return _run_change_plan(df, plan, metric, coupang_sales)
+    df = _scope(df, metric, coupang_sales)
     group_by = _get(plan, "group_by")
     descending = _get(plan, "sort", "desc") != "asc"
     limit = _get(plan, "limit", DEFAULT_LIMIT)
@@ -139,13 +168,13 @@ def _change(base: str, current: dict, previous: dict) -> float | None:
     return None if cur is None or prev is None else _pct_change(cur, prev)
 
 
-def _run_change_plan(df, plan, metric: str) -> list[dict]:
+def _run_change_plan(df, plan, metric: str, coupang_sales=None) -> list[dict]:
     """증감 지표 (예: ad_spend_change) — 기준 월(period, 없으면 최신 월)과 달력상 전월을 그룹별로 비교한다.
 
     각 행: 그룹 키, {원 지표}_previous, {원 지표}, {증감 지표}. 전월 자료가 없거나 월별로 묶으면 AppError.
     """
     base = CHANGE_METRICS[metric]
-    df = _scope(df, base)
+    df = _scope(df, base, coupang_sales)
     group_by = _get(plan, "group_by")
     descending = _get(plan, "sort", "desc") != "asc"
     limit = _get(plan, "limit", DEFAULT_LIMIT)

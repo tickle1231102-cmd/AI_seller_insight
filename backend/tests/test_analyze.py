@@ -43,10 +43,10 @@ class FakeAI:
 
 @pytest.fixture
 def fake_analysis(monkeypatch):
-    monkeypatch.setattr(normalize, "normalize_files", lambda files, periods=None: pd.DataFrame(CONTRACT["rows"]))
+    monkeypatch.setattr(normalize, "normalize_with_coupang_sales", lambda files, periods=None: (pd.DataFrame(CONTRACT["rows"]), None))
     monkeypatch.setattr(kpi, "compute_kpis", lambda df: CONTRACT["kpis"])
     monkeypatch.setattr(compare, "build_comparison", lambda df: CONTRACT["comparison"])
-    monkeypatch.setattr(compare, "run_plan", lambda df, plan: [{"platform": "coupang", "roas": 291.7}])
+    monkeypatch.setattr(compare, "run_plan", lambda df, plan, coupang_sales=None: [{"platform": "coupang", "roas": 291.7}])
     monkeypatch.setattr(signals, "detect_signals", lambda kpis, comparison: CONTRACT["signals"])
 
 
@@ -145,7 +145,7 @@ def test_normalize_error_passes_through(monkeypatch):
     def raise_empty(files, periods=None):
         raise AppError("EMPTY_FILE", "데이터가 없는 파일입니다.", 422, {"file": files[0][0]})
 
-    monkeypatch.setattr(normalize, "normalize_files", raise_empty)
+    monkeypatch.setattr(normalize, "normalize_with_coupang_sales", raise_empty)
     res = client.post("/api/analyze", files=FILES)
     assert res.status_code == 422
     assert res.json()["error"] == {
@@ -159,7 +159,7 @@ def test_normalize_error_passes_through(monkeypatch):
 def test_run_plan_app_error_becomes_unsupported(fake_analysis, monkeypatch):
     from app.core.errors import AppError
 
-    def no_period(df, plan):
+    def no_period(df, plan, coupang_sales=None):
         raise AppError("PERIOD_NOT_FOUND", "2026-07 데이터가 없습니다.", 422)
 
     monkeypatch.setattr(compare, "run_plan", no_period)
@@ -174,7 +174,7 @@ def test_run_plan_app_error_becomes_unsupported(fake_analysis, monkeypatch):
 
 
 def test_run_plan_bug_logged_separately(fake_analysis, monkeypatch, caplog):
-    def bug(df, plan):
+    def bug(df, plan, coupang_sales=None):
         raise KeyError("roas")
 
     monkeypatch.setattr(compare, "run_plan", bug)
@@ -188,7 +188,7 @@ def test_run_plan_bug_logged_separately(fake_analysis, monkeypatch, caplog):
 
 
 class ChattyAI(FakeAI):
-    def create_small_talk_reply(self, question, *, has_store=False):
+    def create_small_talk_reply(self, question, *, has_store=False, has_coupang_sales=False):
         if question.startswith("안녕"):
             return {"status": "unsupported_question", "summary": "안녕하세요! 판매·광고 데이터를 함께 살펴보는 AI 어시스턴트예요."}
         return None

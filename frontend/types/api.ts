@@ -144,6 +144,61 @@ export interface StoreKpis {
   trend: StoreTrendPoint[];
 }
 
+// 쿠팡 판매 분석 (옵션별 지표: 퍼널·취소)
+export interface CoupangValues {
+  visits: number;
+  views: number;
+  cart_adds: number;
+  orders: number;
+  units: number;
+  gross_revenue: number; // 총 매출(원)
+  revenue: number; // 매출(원), 취소 반영
+  gross_units: number;
+  cancel_units: number;
+  cancel_amount: number;
+  conversion_rate: number | null; // 주문/방문자 (%)
+  cart_rate: number | null; // 장바구니/방문자 (%)
+  cancel_rate: number | null; // 취소 상품수/총 판매수 (%)
+  cancel_amount_rate: number | null; // 취소 금액/총 매출 (%)
+  aov: number | null; // 매출/주문
+}
+
+export interface CoupangChange {
+  visits_change: number | null;
+  orders_change: number | null;
+  revenue_change: number | null;
+  aov_change: number | null;
+  conversion_rate_change_pp: number | null;
+  cart_rate_change_pp: number | null;
+  cancel_rate_change_pp: number | null;
+  cancel_amount_rate_change_pp: number | null;
+}
+
+export interface CoupangProduct {
+  product_id: string; // 옵션 ID
+  product_name: string; // 옵션명
+  visits: number;
+  cart_adds: number;
+  orders: number;
+  revenue: number;
+  conversion_rate: number | null;
+  cart_rate: number | null;
+  cancel_rate: number | null;
+  aov: number | null;
+  conversion_rate_change_pp: number | null;
+  cancel_rate_change_pp: number | null;
+}
+
+export interface CoupangKpis {
+  period: string;
+  previous_period: string | null;
+  current: CoupangValues;
+  previous: CoupangValues | null;
+  change: CoupangChange;
+  products: CoupangProduct[];
+  trend: StoreTrendPoint[];
+}
+
 export type SignalCode =
   | "ROAS_DOWN_WITH_SPEND_GROWTH"
   | "REVENUE_DOWN"
@@ -175,6 +230,7 @@ export interface AnalyzeResponse {
   signals: Signal[];
   insight: Insight;
   store?: StoreKpis | null; // 스마트스토어 판매 분석 파일이 없으면 null
+  coupang?: CoupangKpis | null; // 쿠팡 판매 분석(옵션별 지표) 파일이 없으면 null
   dashboard?: Dashboard | null;
 }
 

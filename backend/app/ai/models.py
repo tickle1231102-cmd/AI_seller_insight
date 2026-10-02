@@ -32,6 +32,17 @@ Metric = Literal[
     "conversion_rate_change_pp",
     "refund_rate_change_pp",
     "discount_rate_change_pp",
+    # 쿠팡 판매 분석(옵션별 지표) 파일 전용
+    "coupang_visits",
+    "coupang_aov",
+    "coupang_conversion_rate",
+    "coupang_cart_rate",
+    "coupang_cancel_rate",
+    "coupang_visits_change",
+    "coupang_aov_change",
+    "coupang_conversion_rate_change_pp",
+    "coupang_cart_rate_change_pp",
+    "coupang_cancel_rate_change_pp",
 ]
 GroupBy = Literal["platform", "period", "product"]
 SortOrder = Literal["asc", "desc"]

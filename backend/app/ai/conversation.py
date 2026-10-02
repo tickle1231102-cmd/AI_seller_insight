@@ -27,6 +27,7 @@ CAPABILITIES = (
     "플랫폼별·상품별·월별로 비교하고, 전월 대비 얼마나 늘거나 줄었는지 알려드릴 수 있어요."
 )
 STORE_CAPABILITIES = " 스마트스토어 판매 분석 파일이 있으면 방문수·구매전환율·환불률도 볼 수 있어요."
+COUPANG_CAPABILITIES = " 쿠팡 판매 분석 파일이 있으면 쿠팡 방문자·구매전환율·장바구니율·취소율도 볼 수 있어요."
 REPLIES = {
     "greeting": "안녕하세요! 판매·광고 데이터를 함께 살펴보는 AI 어시스턴트예요. ",
     "thanks": "도움이 되었다니 다행이에요. 더 궁금한 점이 있으면 편하게 물어봐 주세요. ",
@@ -47,10 +48,11 @@ def small_talk_kind(question: str) -> str | None:
     return None
 
 
-def create_small_talk_reply(question: str, *, has_store: bool = False) -> Insight | None:
+def create_small_talk_reply(question: str, *, has_store: bool = False, has_coupang_sales: bool = False) -> Insight | None:
     """Fixed reply for greeting/thanks/help messages, or None for everything else."""
     kind = small_talk_kind(question)
     if kind is None:
         return None
-    capabilities = CAPABILITIES + (STORE_CAPABILITIES if has_store else "")
+    capabilities = (CAPABILITIES + (STORE_CAPABILITIES if has_store else "")
+                    + (COUPANG_CAPABILITIES if has_coupang_sales else ""))
     return Insight(status="unsupported_question", summary=REPLIES[kind] + capabilities)

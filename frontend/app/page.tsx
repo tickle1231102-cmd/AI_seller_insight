@@ -9,6 +9,7 @@ import { KpiCards } from "@/features/dashboard/KpiCards";
 import { TrendChart } from "@/features/dashboard/TrendChart";
 import { PlatformCompare } from "@/features/dashboard/PlatformCompare";
 import { StoreSection } from "@/features/dashboard/StoreSection";
+import { CoupangSection } from "@/features/dashboard/CoupangSection";
 import { DashboardViewToggle, PlatformDashboard, type DashboardView } from "@/features/dashboard/PlatformDashboard";
 import { label as dashboardPlatformLabel } from "@/features/dashboard/dashboardMetrics";
 import { SignalBadges } from "@/features/dashboard/SignalBadges";
@@ -218,6 +219,7 @@ export default function Home() {
           {result.dashboard ? <PlatformDashboard data={result.dashboard} view={dashboardView} mode={mode} collapsed={collapsedPlatforms} onToggle={(p) => setCollapsedPlatforms((prev) => ({ ...prev, [p]: !prev[p] }))} /> : <KpiCards kpis={result.kpis} mode={mode} />}
           <SignalBadges signals={result.signals} />
           {!result.dashboard && mode === "sales" && result.store && <StoreSection store={result.store} />}
+          {mode === "sales" && result.coupang && <CoupangSection coupang={result.coupang} />}
 
           <p className="muted small">AI는 선택한 화면 모드와 무관하게 업로드된 전체 데이터 기준으로 답합니다.</p>
           {!result.dashboard && (
@@ -229,6 +231,7 @@ export default function Home() {
                 </>
               )}
               {!result.dashboard && mode === "ad" && result.store && <StoreSection store={result.store} />}
+              {mode === "ad" && result.coupang && <CoupangSection coupang={result.coupang} />}
             </div>
           )}
         </div>

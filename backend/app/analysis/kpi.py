@@ -170,3 +170,78 @@ def compute_store_kpis(df: pd.DataFrame) -> dict | None:
         "products": products[:STORE_PRODUCT_LIMIT],
         "trend": trend,
     }
+
+
+# ---- 쿠팡 판매 분석 (옵션별 지표) ----
+COUPANG_SUM_FIELDS = ["visits", "views", "cart_adds", "orders", "units", "gross_revenue", "revenue",
+                      "gross_units", "cancel_units", "cancel_amount"]
+COUPANG_RATIOS = {  # 비율(%) ← (분자, 분모). 합계로 다시 계산한다.
+    "conversion_rate": ("orders", "visits"),
+    "cart_rate": ("cart_adds", "visits"),
+    "cancel_rate": ("cancel_units", "gross_units"),
+    "cancel_amount_rate": ("cancel_amount", "gross_revenue"),
+}
+COUPANG_CHANGE_FIELDS = ["visits", "orders", "revenue", "aov"]
+COUPANG_PRODUCT_LIMIT = 10
+
+
+def coupang_totals(df: pd.DataFrame) -> dict:
+    """쿠팡 판매 분석 행 묶음 → 합계 + 비율. aov = 매출(취소 반영)/주문."""
+    s = {f: int(df[f].sum()) for f in COUPANG_SUM_FIELDS}
+    rates = {k: _round1(_ratio(s[n], s[d])) for k, (n, d) in COUPANG_RATIOS.items()}
+    return {**s, **rates, "aov": round(s["revenue"] / s["orders"]) if s["orders"] else None}
+
+
+def _coupang_change(current: dict, previous: dict | None) -> dict:
+    change: dict = {}
+    for f in COUPANG_CHANGE_FIELDS:
+        cur, prev = current[f], previous[f] if previous else None
+        change[f"{f}_change"] = None if cur is None or not prev else _pct_change(cur, prev)
+    for f, (n, d) in COUPANG_RATIOS.items():
+        cur = _ratio(current[n], current[d])
+        prev = _ratio(previous[n], previous[d]) if previous else None
+        change[f"{f}_change_pp"] = None if cur is None or prev is None else round(cur - prev, 1)
+    return change
+
+
+def compute_coupang_kpis(sales: pd.DataFrame | None) -> dict | None:
+    """normalize_with_coupang_sales 의 두 번째 값 → AnalyzeResponse.coupang. 쿠팡 판매 분석 파일이 없으면 None.
+
+    기간 규칙은 compute_store_kpis 와 같다 (최신 월 vs 달력상 앞달). products 는 최신 월 옵션별 지표(매출 내림차순, 최대 10개).
+    """
+    if sales is None or sales.empty:
+        return None
+    periods = sorted(sales["period"].unique())
+    period = periods[-1]
+    previous_period = comparison_period(period, periods)
+    cur_df = sales[sales["period"] == period]
+    prev_df = sales[sales["period"] == previous_period] if previous_period else None
+    current = coupang_totals(cur_df)
+    previous = coupang_totals(prev_df) if prev_df is not None else None
+
+    products = []
+    for (pid, name), group in cur_df.groupby(["product_id", "product_name"], sort=True):
+        t = coupang_totals(group)
+        prev_group = prev_df[prev_df["product_id"] == pid] if prev_df is not None else None
+        p = coupang_totals(prev_group) if prev_group is not None and not prev_group.empty else None
+        change = _coupang_change(t, p)
+        products.append({
+            "product_id": str(pid),
+            "product_name": name,
+            **{k: t[k] for k in ("visits", "cart_adds", "orders", "revenue", "conversion_rate", "cart_rate", "cancel_rate", "aov")},
+            "conversion_rate_change_pp": change["conversion_rate_change_pp"],
+            "cancel_rate_change_pp": change["cancel_rate_change_pp"],
+        })
+    products.sort(key=lambda r: r["revenue"], reverse=True)
+
+    trend = [{"period": p, **{k: coupang_totals(g)[k] for k in ("visits", "orders", "revenue", "conversion_rate")}}
+             for p, g in sales.groupby("period", sort=True)]
+    return {
+        "period": period,
+        "previous_period": previous_period,
+        "current": current,
+        "previous": previous,
+        "change": _coupang_change(current, previous),
+        "products": products[:COUPANG_PRODUCT_LIMIT],
+        "trend": trend,
+    }

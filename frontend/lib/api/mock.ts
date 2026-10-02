@@ -1,4 +1,5 @@
-import type { AnalyzeResponse, Insight, PreviewResponse, Platform, StoreKpis } from "@/types/api";
+import type { AnalyzeResponse, CoupangKpis, Insight, PreviewResponse, Platform, StoreKpis } from "@/types/api";
+import mockCoupang from "./mockCoupang.json";
 import mockStore from "./mockStore.json";
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -59,10 +60,18 @@ function mockInsight(question?: string): Insight {
 }
 
 // 스마트스토어 판매 분석 파일(sales_*.xlsx)이 있으면 store 블록을 붙인다. 값은 shared/fixtures/smartstore 샘플의 백엔드 계산 결과.
+// 쿠팡 판매 분석 파일(SELLER_INSIGHTS_*.xlsx)이 있으면 coupang 블록을 붙인다. 값은 shared/fixtures/exports 의 쿠팡 판매 분석 샘플을
+// 9월로, 옵션마다 80~96% 로 줄인 사본을 8월로 둔 백엔드 계산 결과 (전월 대비 증감이 보이도록).
+const COUPANG_SALES_FILE = /seller_insights|vendor_item/i;
 export async function mockAnalyze(files: File[], question?: string): Promise<AnalyzeResponse> {
   const res = await mockBaseAnalyze(files, question);
   const hasSales = files.some((f) => /^sales_/i.test(f.name));
-  return { ...res, store: hasSales ? (mockStore as StoreKpis) : null };
+  const hasCoupangSales = files.some((f) => COUPANG_SALES_FILE.test(f.name));
+  return {
+    ...res,
+    store: hasSales ? (mockStore as StoreKpis) : null,
+    coupang: hasCoupangSales ? (mockCoupang as CoupangKpis) : null,
+  };
 }
 
 async function mockBaseAnalyze(files: File[], question?: string): Promise<AnalyzeResponse> {

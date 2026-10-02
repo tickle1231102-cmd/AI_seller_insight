@@ -12,7 +12,7 @@ import io
 import logging
 import re
 import traceback
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
@@ -77,6 +77,8 @@ class ExportFormat:
     id_column: str
     name_column: str
     date_column: str | None = None
+    # 플랫폼 판매 분석 전용 지표 (공통 필드 → 원본 컬럼). 컬럼이 모두 있을 때만 읽고, 하나라도 없으면 건너뛴다.
+    extra_map: dict[str, str] = field(default_factory=dict)
 
 
 EXPORT_FORMATS = [
@@ -84,6 +86,8 @@ EXPORT_FORMATS = [
     ExportFormat(
         "coupang_sales", "coupang", frozenset({"옵션 ID", "등록상품ID", "매출(원)"}),
         {"revenue": "매출(원)", "orders": "주문", "units": "판매량"}, "옵션 ID", "옵션명",
+        extra_map={"visits": "방문자", "views": "조회", "cart_adds": "장바구니", "gross_revenue": "총 매출(원)",
+                   "gross_units": "총 판매수", "cancel_amount": "총 취소 금액(원)", "cancel_units": "총 취소된 상품수"},
     ),
     # 쿠팡 광고센터 > 광고 보고서 (옵션·키워드 단위). 광고매출은 14일 기준 총 전환매출액.
     ExportFormat(
@@ -100,6 +104,8 @@ EXPORT_FORMATS = [
 NORMALIZED_COLUMNS = ["period", "platform", "product_id", "product_name", "revenue", "orders", "units", "ad_spend", "ad_revenue"]
 # 스마트스토어 판매 분석 파일에만 있는 지표. 다른 파일의 행은 None.
 STORE_FIELDS = ["gross_revenue", "visits", "refund_count", "refund_amount", "discount_amount"]
+# 쿠팡 판매 분석(옵션별 지표) 전용 지표. 공통 DataFrame 에는 넣지 않고 normalize_with_coupang_sales 가 따로 준다.
+COUPANG_SALES_FIELDS = ["revenue", "orders", "units", *EXPORT_FORMATS[0].extra_map]
 
 MIN_PLATFORM_MATCH = 3  # 플랫폼 지표 컬럼 5개 중 이 개수 이상 맞아야 그 플랫폼으로 본다
 PREVIEW_ROWS = 10
@@ -119,6 +125,7 @@ class _Parsed:
     product_names: list[str]
     metrics: dict[str, list[int | float]]  # 원본 컬럼명 → 숫자로 바꾼 값
     observed: dict[str, list[bool]]  # 실제 0과 빈 셀/대시를 구분한다
+    extras: dict[str, list[int | float]] = field(default_factory=dict)  # ExportFormat.extra_map 필드 → 값
 
     @property
     def metric_columns(self) -> list[str]:
@@ -329,8 +336,13 @@ def _parse_export(filename: str, df: pd.DataFrame, export: ExportFormat) -> _Par
         periods = [file_period] * len(df)
     metrics = _parse_numbers(filename, df, metric_columns, dash_is_zero=True)
     observed = {c: [v not in ("", "-") for v in df[c]] for c in metric_columns}
+    extras: dict[str, list[int | float]] = {}
+    if export.extra_map and set(export.extra_map.values()) <= columns:
+        raw = _parse_numbers(filename, df, list(export.extra_map.values()), dash_is_zero=True)
+        # 쿠팡은 취소 금액·수량을 음수로 내려준다. 크기만 쓴다.
+        extras = {f: [abs(v) for v in raw[c]] for f, c in export.extra_map.items()}
     return _Parsed(export.platform, periods, export, export.field_map,
-                   df[export.id_column].tolist(), df[export.name_column].tolist(), metrics, observed)
+                   df[export.id_column].tolist(), df[export.name_column].tolist(), metrics, observed, extras)
 
 
 def preview_file(filename: str, content: bytes) -> dict:
@@ -356,7 +368,13 @@ def preview_file(filename: str, content: bytes) -> dict:
 
 
 def normalize_files(files: list[tuple[str, bytes]], periods: dict[str, str] | None = None) -> pd.DataFrame:
-    """업로드 파일 전체 [(filename, content), ...] → 공통 스키마 9개 필드 DataFrame (TECH_SPEC 4장).
+    return normalize_with_coupang_sales(files, periods)[0]
+
+
+def normalize_with_coupang_sales(
+    files: list[tuple[str, bytes]], periods: dict[str, str] | None = None
+) -> tuple[pd.DataFrame, pd.DataFrame | None]:
+    """업로드 파일 전체 → (공통 스키마 9개 필드 DataFrame (TECH_SPEC 4장), 쿠팡 판매 분석 옵션별 지표 또는 None).
 
     금액·수량은 int 로 반올림한다 (B 의 스키마가 정수만 받는다). 행은 기간·플랫폼·상품ID 순.
     오류는 preview_file 과 같고, 어느 파일인지는 details.file 로 구분된다.
@@ -371,6 +389,7 @@ def normalize_files(files: list[tuple[str, bytes]], periods: dict[str, str] | No
     """
     periods = periods or {}
     frames = []
+    sales_frames = []
     diagnosis_rows = []
     dashboard_sources = []
     for filename, content in files:
@@ -397,6 +416,10 @@ def normalize_files(files: list[tuple[str, bytes]], periods: dict[str, str] | No
                 **values,
             }
         )
+        if parsed.extras:
+            extra = {f: [int(round(v)) for v in vals] for f, vals in parsed.extras.items()}
+            sales = pd.DataFrame({**frame[["period", "product_id", "product_name", *values]].to_dict("list"), **extra})
+            sales_frames.append(sales)
         if parsed.is_smartstore or parsed.export is not None:
             for field in NORMALIZED_COLUMNS[4:]:
                 if field not in frame:
@@ -414,7 +437,14 @@ def normalize_files(files: list[tuple[str, bytes]], periods: dict[str, str] | No
         df = df[NORMALIZED_COLUMNS]
     df = df.sort_values(["period", "platform", "product_id"], kind="stable").reset_index(drop=True)
     df.attrs["dashboard_sources"] = dashboard_sources
-    return attach_sources(df, diagnosis_rows)
+    sales = None
+    if sales_frames:
+        sales = pd.concat(sales_frames, ignore_index=True)
+        keys = ["period", "product_id"]
+        names = sales.groupby(keys, sort=False)["product_name"].first()
+        sales = sales.drop(columns="product_name").groupby(keys, sort=True).sum().join(names).reset_index()
+        sales = sales[["period", "product_id", "product_name", *COUPANG_SALES_FIELDS]]
+    return attach_sources(df, diagnosis_rows), sales
 
 
 def core_rows(df: pd.DataFrame) -> pd.DataFrame:

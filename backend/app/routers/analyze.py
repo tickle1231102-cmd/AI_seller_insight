@@ -33,27 +33,28 @@ def _dump(value: Any) -> Any:
     return value.model_dump() if hasattr(value, "model_dump") else value
 
 
-def _small_talk(ai, question: str, has_store: bool):
+def _small_talk(ai, question: str, has_store: bool, has_coupang_sales: bool = False):
     """인사·기능 안내는 planner 를 부르지 않고 서버 고정 문구로 답한다. 실패하면 None → 기존 흐름."""
     reply_fn = getattr(ai, "create_small_talk_reply", None)
     if reply_fn is None:
         return None
     try:
-        result = reply_fn(question, has_store=has_store)  # D
+        result = reply_fn(question, has_store=has_store, has_coupang_sales=has_coupang_sales)  # D
         return Insight.model_validate(_dump(result)) if result is not None else None
     except Exception:
         logger.exception("small talk reply failed")
         return None
 
 
-def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | None) -> Insight:
+def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | None, coupang_sales=None) -> Insight:
     """TECH_SPEC 1장 7·8단계. 예외를 밖으로 내보내지 않는다."""
     try:
         ai = _load_ai()
         plan, answer = None, None
 
         if question:
-            chat = _small_talk(ai, question, has_store=bool((df["platform"] == normalize.STORE_PLATFORM).any()))
+            chat = _small_talk(ai, question, has_store=bool((df["platform"] == normalize.STORE_PLATFORM).any()),
+                                has_coupang_sales=coupang_sales is not None)
             if chat is not None:
                 return chat
             periods = sorted(df["period"].unique())
@@ -65,7 +66,7 @@ def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | 
                 return Insight(status="llm_error")
             plan = plan_result.plan
             try:
-                answer = compare.run_plan(df, plan)  # C
+                answer = compare.run_plan(df, plan, coupang_sales)  # C
             except AppError as exc:
                 # 계획은 맞지만 데이터로 답할 수 없는 경우 (예: 없는 월). KPI 는 유지하고 이유를 안내한다.
                 return Insight(status="unsupported_question", plan=_dump(plan), summary=exc.message)
@@ -86,15 +87,16 @@ def _run_ai(df, kpis: dict, comparison: dict, sigs: list[dict], question: str | 
 
 
 def _analyze(uploads: list[UploadedFile], question: str | None, periods: dict[str, str] | None = None) -> AnalyzeResponse:
-    df = normalize.normalize_files([(u.filename, u.content) for u in uploads], periods)  # 2·3
+    df, coupang_sales = normalize.normalize_with_coupang_sales([(u.filename, u.content) for u in uploads], periods)  # 2·3
     # 스마트스토어 판매 분석 행을 kpis·comparison·신호에 넣을지는 normalize.core_rows 가 정한다 (판매액 중복 방지).
     core = normalize.core_rows(df)
     kpis = kpi.compute_kpis(core)  # 4
     store = kpi.compute_store_kpis(df)  # 4-1 스마트스토어 판매 분석 (없으면 None)
+    coupang = kpi.compute_coupang_kpis(coupang_sales)  # 4-2 쿠팡 판매 분석 (없으면 None)
     comparison = compare.build_comparison(core)  # 5
     sigs = signals.detect_signals(kpis, comparison)  # 6
     # 질문은 전체 행을 넘긴다. run_plan 이 지표마다 스마트스토어 행을 쓸지 뺄지 정한다.
-    insight = _run_ai(df, kpis, comparison, sigs, question)  # 7·8
+    insight = _run_ai(df, kpis, comparison, sigs, question, coupang_sales)  # 7·8
     return AnalyzeResponse(  # 9
         kpis=kpis,
         comparison=comparison,
@@ -102,6 +104,7 @@ def _analyze(uploads: list[UploadedFile], question: str | None, periods: dict[st
         signals=sigs,
         insight=insight,
         store=store,
+        coupang=coupang,
         dashboard=build_dashboard(df, kpis["period"]),
     )
 
